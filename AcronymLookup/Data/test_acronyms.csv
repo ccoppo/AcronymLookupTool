@@ -1,0 +1,22 @@
+﻿abbreviation,definition,category,notes 
+API,Application Programming Interface,Software,Used for connecting different software systems
+HTTP,HyperText Transfer Protocol,Networking,Foundation of web communication
+SaaS,Software as a Service ,Software,
+JSON,JavaScript Object Notation,Data Format,
+XML,eXtensible Markup Language,Data Format ,
+PaaS,Platform as a Service,Software,
+CPU,Central Processing Unit ,Hardware,
+GPU,Graphics Processing Unit,Hardware,Specialized for graphics and parallel processing
+OS,Operating System,Software,
+RAM,Random Access Memory,Hardware,
+IDE,Integrated Development Enviornment,Software,
+CRM,Customer Relationship Management,Project Management,
+DNS,Domain Name System,Networking ,
+TCP,Transmission Control Protocol ,Networking,Reliable Data Transmission Control Protocol
+SSL,Secure Sockets Layer,Security,
+TLS,Transport Layer Security,Security ,
+HDD,Hard Disk Drive ,Hardware,
+VPN,Virtual Private Network,Security,Secure tunnel for internet traffic
+MVC,Model-View-Control ,Architecture,
+UX,User Experience,Software,
+AI,Artificial Intelligence,Technology,Computer systems that mimic human intelligence
