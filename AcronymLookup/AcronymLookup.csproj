@@ -19,6 +19,7 @@
 	  <StartupObject>AcronymLookup.App</StartupObject>
   </PropertyGroup>
 	<ItemGroup>
+		<PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.2" />
 		<PackageReference Include="System.Drawing.Common" Version="7.0.0" />
 	</ItemGroup>
 

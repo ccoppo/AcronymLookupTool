@@ -33,8 +33,9 @@ namespace AcronymLookup
         
 
         private HotkeyManager? _hotkeyManager;
-        private ClipboardHandler? _clipboardHandler; 
-        private CsvParser? _csvParser;
+        private ClipboardHandler? _clipboardHandler;
+        //private CsvParser? _csvParser;
+        private DatabaseHandler? _databaseHandler; 
         private DefinitionBubble? _currentBubble; 
 
         #endregion
@@ -66,7 +67,7 @@ namespace AcronymLookup
                 ConnectServices();
 
                 // Load CSV data
-                LoadCsvData();
+                TestDatabaseConnection();
 
                 Logger.Log("Application startup complete!");
                 Logger.Log("Workflow: Select text -> Ctrl+C -> Ctrl+Alt+L");
@@ -113,8 +114,14 @@ namespace AcronymLookup
             Logger.Log("Initializing Services");
 
             // 1. Initialize CSV Parser 
-            _csvParser = new CsvParser();
-            Logger.Log("Initialized CSV Parser"); 
+            //_csvParser = new CsvParser();
+            //Logger.Log("Initialized CSV Parser"); 
+
+            //1. initialize database handler 
+            string connectionString = "Server=tcp:acronymlookup-server.database.windows.net,1433;Initial Catalog=AcronymLookupDB;Persist Security Info=False;User ID=<username>;Password=<password>;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"; 
+            _databaseHandler = new DatabaseHandler(connectionString);
+            Logger.Log("Initialized Database Handler"); 
+
 
             // 2. Initialize Clipboard Handler
             _clipboardHandler = new ClipboardHandler();
@@ -134,7 +141,7 @@ namespace AcronymLookup
         {
             Logger.Log("Connecting services...");
 
-            if (_hotkeyManager != null && _clipboardHandler != null && _csvParser != null)
+            if (_hotkeyManager != null && _clipboardHandler != null && _databaseHandler != null)
             {
                 // Connect: Hotkey Press → Start Clipboard Capture
                 _hotkeyManager.HotkeyPressed += OnHotkeyPressed;
@@ -164,27 +171,24 @@ namespace AcronymLookup
             }
         }
 
-        /// <summary>
-        /// Load the CSV abbreviation data
-        /// </summary>
-        private void LoadCsvData()
+        private void TestDatabaseConnection()
         {
-            Logger.Log("Loading CSV data...");
+            Logger.Log("Testing database connection...");
 
-            if (_csvParser != null)
+            if (_databaseHandler != null)
             {
-                string csvPath = "Data/test_acronyms.csv";
-                bool loaded = _csvParser.LoadFromFile(csvPath);
+                bool connected = _databaseHandler.TestConnection();
 
-                if (loaded)
+                if (connected)
                 {
-                    Logger.Log($"Successfully loaded {_csvParser.Count} abbreviations from CSV");
+                    int count = _databaseHandler.Count;
+                    Logger.Log($"Successfully connected to database with {count} abbreviation");
                 }
                 else
                 {
-                    Logger.Log(" Failed to load CSV file - abbreviation lookup will not work");
-                    MessageBox.Show("Could not load abbreviation data. Please check that the CSV file exists.",
-                        "Data Loading Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    Logger.Log($"Failed to connect to database");
+                    MessageBox.Show("Could not connect to Azure SQL Database. Please check your connection string.", "Database Connection Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+
                 }
             }
         }
@@ -230,6 +234,7 @@ namespace AcronymLookup
                 if (e.Success && !string.IsNullOrWhiteSpace(e.CapturedText))
                 {
                     Logger.Log($"Text captured: '{e.CapturedText}' - looking up...");
+                    Logger.Log($"Text length: {e.CapturedText.Length}, First char code: {(int)e.CapturedText[0]}, Last char code: {(int)e.CapturedText[e.CapturedText.Length - 1]}"); 
 
                     // Look up the abbreviation
                     LookupAbbreviation(e.CapturedText);
@@ -260,11 +265,11 @@ namespace AcronymLookup
         {
             try
             {
-                if (_csvParser != null)
+                if (_databaseHandler != null)
                 {
                     Logger.Log($"Looking up: '{searchTerm}'");
 
-                    var result = _csvParser.FindAbbreviation(searchTerm);
+                    var result = _databaseHandler.FindAbbreviation(searchTerm);
 
                     if (result != null)
                     {
@@ -490,7 +495,7 @@ namespace AcronymLookup
                 }
 
                 // CSV parser doesn't need special cleanup
-                _csvParser = null;
+                _databaseHandler = null;
                 Logger.Log("All services cleaned up");
             }
             catch (Exception ex)
