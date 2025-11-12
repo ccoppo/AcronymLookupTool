@@ -66,7 +66,7 @@ namespace AcronymLookup.Core
 
                 //SQL query to find matching abbreviations
                 string query = @"
-                    SELECT TOP 1 
+                    SELECT
                         Abbreviation, 
                         Definition, 
                         Category, 

@@ -7,9 +7,11 @@ using AcronymLookup.Utilities;
 using System;
 using System.Drawing;
 using System.Runtime.InteropServices;
+using Microsoft.Extensions.Configuration; 
 using System.Windows;
 using static AcronymLookup.Services.ClipboardHandler;
 using static AcronymLookup.UI.DefinitionBubble;
+using static AcronymLookup.UI.AddTermWindow; 
 //using AcronymLookup.UI; 
 
 namespace AcronymLookup
@@ -118,7 +120,11 @@ namespace AcronymLookup
             //Logger.Log("Initialized CSV Parser"); 
 
             //1. initialize database handler 
-            string connectionString = "Server=tcp:acronymlookup-server.database.windows.net,1433;Initial Catalog=AcronymLookupDB;Persist Security Info=False;User ID=<username>;Password=<password>;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"; 
+            var configuration = new ConfigurationBuilder()
+                .AddUserSecrets<App>()
+                .Build();
+            string connectionString = configuration.GetConnectionString("AzureDatabase")
+                ?? throw new InvalidOperationException("Connection string not found in user secrets"); 
             _databaseHandler = new DatabaseHandler(connectionString);
             Logger.Log("Initialized Database Handler"); 
 
@@ -244,7 +250,7 @@ namespace AcronymLookup
                     Logger.Log($"Text capture failed: {e.ErrorMessage}");
 
                     // Show error to user
-                    ShowLookupResult(null, e.ErrorMessage ?? "Failed to capture text");
+                    ShowLookupResult(null, e.ErrorMessage ?? "Failed to capture text", null);
                 }
             }
             catch (Exception ex)
@@ -274,24 +280,24 @@ namespace AcronymLookup
                     if (result != null)
                     {
                         Logger.Log($"Found: {result.Abbreviation} = {result.Definition}");
-                        ShowLookupResult(result, null);
+                        ShowLookupResult(result, null, searchTerm);
                     }
                     else
                     {
                         Logger.Log($" Not found: '{searchTerm}'");
-                        ShowLookupResult(null, $"'{searchTerm}' not found in abbreviation database");
+                        ShowLookupResult(null, $"'{searchTerm}' not found in abbreviation database", searchTerm);
                     }
                 }
                 else
                 {
                     Logger.Log("CSV parser not available");
-                    ShowLookupResult(null, "Abbreviation database not loaded");
+                    ShowLookupResult(null, "Abbreviation database not loaded", null);
                 }
             }
             catch (Exception ex)
             {
                 Logger.Log($"Error during lookup: {ex.Message}");
-                ShowLookupResult(null, $"Lookup error: {ex.Message}");
+                ShowLookupResult(null, $"Lookup error: {ex.Message}", null);
             }
         }
 
@@ -299,7 +305,7 @@ namespace AcronymLookup
         /// Shows the lookup result to the user
         /// TODO: Later this will show the bubble UI - for now just console + message box
         /// </summary>
-        private void ShowLookupResult(AbbreviationData? result, string? errorMessage)
+        private void ShowLookupResult(AbbreviationData? result, string? errorMessage, string? searchTerm = null)
         {
             try
             {
@@ -319,40 +325,9 @@ namespace AcronymLookup
                     Logger.Log($"showing error to user: {errorMessage}");
 
                     var emptyList = new List<AbbreviationData>();
-                    string displayTerm = errorMessage ?? "Lookup Failed";
-                    ShowErrorBubble(displayTerm); 
+                    string displayTerm = searchTerm ?? "Unknown Term";
+                    ShowDefinitionBubble(displayTerm, emptyList); 
                 }
-            
-                /*
-                if (result != null)
-                {
-                    // SUCCESS: Show the abbreviation definition
-                    string message = $"{result.Abbreviation}\n\n{result.Definition}";
-
-                    if (!string.IsNullOrEmpty(result.Category))
-                        message += $"\n\n Category: {result.Category}";
-
-                    if (!string.IsNullOrEmpty(result.Notes))
-                        message += $"\n\n Notes: {result.Notes}";
-
-                    Logger.Log($"Showing result to user: {result}");
-
-                    MessageBox.Show(message,
-                        "Abbreviation Found",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
-                }
-                else
-                {
-                    // ERROR: Show error message
-                    Logger.Log($"Showing error to user: {errorMessage}");
-
-                    MessageBox.Show(errorMessage ?? "Unknown error",
-                        "Lookup Failed",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
-                }
-                */
             }
             catch (Exception ex)
             {
@@ -453,17 +428,70 @@ namespace AcronymLookup
             {
                 Logger.Log($"Add term requested for '{e.SearchTerm}'");
 
-                //todo: implement add term feature 
-                MessageBox.Show(
-                    $"Add term requessted for '{e.SearchTerm}'\n\n" +
-                    "This feature will be implemented later!",
-                    "Add Term",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                var addTermWindow = new AddTermWindow(e.SearchTerm);
+
+                //subscribe to the term added event
+                addTermWindow.TermAdded += OnTermAdded;
+
+                //show the window as a dialog 
+                bool? result = addTermWindow.ShowDialog();
             }
             catch (Exception ex)
             {
-                Logger.Log($"Error handling add term: {ex.Message}");
+
+            }
+
+
+        }
+
+        private void OnTermAdded(object? sender, TermAddedEventArgs e)
+        {
+            try
+            {
+                Logger.Log($"Saving term to database: {e.Abbreviation}");
+
+                if (_databaseHandler != null)
+                {
+                    bool success = _databaseHandler.AddAbbreviation(
+                        e.Abbreviation,
+                        e.Definition,
+                        e.Category,
+                        e.Notes,
+                        "User"
+                    );
+
+                    if (success)
+                    {
+                        Logger.Log($"Term '{e.Abbreviation}' saved to database successfully");
+                    }
+                    else
+                    {
+                        Logger.Log($"Failed to save term '{e.Abbreviation}' to database");
+                        MessageBox.Show(
+                            $"Failed to save term. Term may already exist in database.",
+                            "Save Failed",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning);
+                    }
+                }
+                else
+                {
+                    Logger.Log("Database Handler Not Available");
+                    MessageBox.Show(
+                        "Database connection is not available",
+                        "Error",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error saving term: {ex.Message}");
+                MessageBox.Show(
+                    $"Error saving term: {ex.Message}",
+                    "Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
             }
         }
 
