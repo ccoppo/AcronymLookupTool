@@ -10,6 +10,9 @@ namespace AcronymLookup.Core
     {
         #region Private Fields 
         private readonly string _connectionString;
+        private int _currentUserId;
+        private int _currentProjectId; 
+
 
         #endregion
 
@@ -26,6 +29,90 @@ namespace AcronymLookup.Core
         }
 
         #endregion
+
+        #region public user methods 
+        public void SetUserContext(int userId, int projectId)
+        {
+            _currentUserId = userId;
+            _currentProjectId = projectId;
+            Logger.Log($"Database context set: UserID={userId}, ProjectID={projectId}");
+        }
+
+        public int CurrentUserId => _currentUserId;
+        public int CurrentProjectId => _currentProjectId; 
+
+        public int? GetUserIdByWindowsUsername(string windowsUsername)
+        {
+            try
+            {
+                string query = @"SELECT UserID FROM Users WHERE WindowsUsername = @WindowsUsername AND isActive = 1"; 
+
+                using (SqlConnection connection = new SqlConnection(_connectionString))
+                {
+                    connection.Open(); 
+
+                    using (SqlCommand command = new SqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@WindowsUsername", windowsUsername);
+
+                        object result = command.ExecuteScalar(); 
+                        if (result != null && result != DBNull.Value)
+                        {
+                            return (int)result; 
+                        }
+                    }
+                }
+
+                Logger.Log($"User not found: {windowsUsername}");
+                return null;
+            }catch (Exception ex)
+            {
+                Logger.Log($"error getting user ID: {ex.Message}");
+                return null; 
+            }
+        }
+
+        public int? GetUserFirstProject(int userId)
+        {
+            try
+            {
+                string query = @"
+                    SELECT TOP 1 pm.ProjectID
+                    FROM ProjectMembers pm
+                    INNER JOIN Projects p on pm.ProjectID = p.ProjectID
+                    WHERE pm.USERID = @UserID
+                    AND pm.IsActive = 1
+                    AND p.IsActive = 1
+                    AND pm.CanViewTerms = 1
+                    ORDER BY pm.DateAdded ASC";
+
+                using (SqlConnection connection = new SqlConnection(_connectionString))
+                {
+                    connection.Open();
+
+                    using (SqlCommand command = new SqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@UserID", userId);
+                        object result = command.ExecuteScalar();
+
+                        if (result != null && result != DBNull.Value)
+                        {
+                            return (int)result;
+                        }
+                    }
+                }
+
+                Logger.Log($"no projects found for user ID: {userId}");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error getting user project: {ex.Message}");
+                return null;
+            }
+        }
+        #endregion 
+
 
         #region Public Methods 
         /// <summary>
@@ -66,23 +153,32 @@ namespace AcronymLookup.Core
 
                 //SQL query to find matching abbreviations
                 string query = @"
-                    SELECT
-                        Abbreviation, 
-                        Definition, 
-                        Category, 
-                        Notes
-                    FROM Abbreviations 
-                    WHERE UPPER(Abbreviation) = @SearchTerm
-                    AND IsActive = 1";
+                    SELECT DISTINCT
+                        a.Abbreviation, 
+                        a.Definition, 
+                        a.Category, 
+                        a.Notes
+                    FROM Abbreviations a
+                    INNER JOIN AbbreviationProjects ap ON a.AbbreviationID = ap.AbbreviationID
+                    INNER JOIN ProjectMembers pm ON ap.ProjectID = pm.ProjectID
+                    WHERE UPPER(a.Abbreviation) = @SearchTerm
+                        AND ap.ProjectID = @ProjectID
+                        AND pm.UserID = @UserID 
+                        AND pm.CanViewTerms = 1
+                        AND a.IsActive = 1 
+                        AND ap.IsActive = 1
+                        AND pm.IsActive = 1";
 
                 using (SqlConnection connection = new SqlConnection(_connectionString))
                 {
-                    connection.Open(); 
+                    connection.Open();
 
                     using (SqlCommand command = new SqlCommand(query, connection))
                     {
                         //add parameter to prevent SQL injection 
                         command.Parameters.AddWithValue("@SearchTerm", cleanedTerm);
+                        command.Parameters.AddWithValue("@ProjectID", _currentProjectId);
+                        command.Parameters.AddWithValue("@UserID", _currentUserId); 
 
                         using (SqlDataReader reader = command.ExecuteReader())
                         {
@@ -216,26 +312,50 @@ namespace AcronymLookup.Core
                 {
                     connection.Open(); 
 
-                    using (SqlCommand command = new SqlCommand(query, connection))
+                    using (SqlTransaction transaction = connection.BeginTransaction())
                     {
-                        //Add Parameters to prevent sql injection 
-                        command.Parameters.AddWithValue("@Abbreviation", abbreviation.Trim().ToUpper());
-                        command.Parameters.AddWithValue("@Definition", definition.Trim());
-                        command.Parameters.AddWithValue("@Category", string.IsNullOrWhiteSpace(category) ? DBNull.Value : category.Trim());
-                        command.Parameters.AddWithValue("@Notes", string.IsNullOrWhiteSpace(notes) ? DBNull.Value : notes.Trim());
-                        command.Parameters.AddWithValue("@CreatedBy", createdBy);
-
-                        //execute the insert 
-                        int rowsAffected = command.ExecuteNonQuery(); 
-
-                        if(rowsAffected > 0)
+                        try
                         {
+                            //insert abbreviation
+                            string insertAbbrevQuery = @" 
+                                INSERT INTO Abbreviations (Abbreviation, Definition, Category, Notes, CreatedBy, CreatedByUserID, IsActive)
+                                VALUES (@Abbreviation, @Definition, @Category, @Notes, @CreatedBy, @CreatedByUserID, 1); 
+                                SELECT CAST(SCOPE_IDENTITY() as int);";
+
+                            int newAbbrevId;
+                            using (SqlCommand command = new SqlCommand(insertAbbrevQuery, connection, transaction))
+                            {
+                                //Add Parameters to prevent sql injection 
+                                command.Parameters.AddWithValue("@Abbreviation", abbreviation.Trim().ToUpper());
+                                command.Parameters.AddWithValue("@Definition", definition.Trim());
+                                command.Parameters.AddWithValue("@Category", string.IsNullOrWhiteSpace(category) ? DBNull.Value : category.Trim());
+                                command.Parameters.AddWithValue("@Notes", string.IsNullOrWhiteSpace(notes) ? DBNull.Value : notes.Trim());
+                                command.Parameters.AddWithValue("@CreatedBy", createdBy);
+                                command.Parameters.AddWithValue("@CreatedByUserID", _currentUserId);
+
+                                newAbbrevId = (int)command.ExecuteScalar(); 
+                            }
+
+                            string linkProjectQuery = @" 
+                                INSERT INTO AbbreviationProjects (AbbreviationID, ProjectID, AddedByUserID, IsActive)
+                                VALUES (@AbbreviationID, @ProjectID, @AddedByUserID, 1)";
+
+                            using (SqlCommand command = new SqlCommand(linkProjectQuery, connection, transaction))
+                            {
+                                command.Parameters.AddWithValue("@AbbreviationID", newAbbrevId);
+                                command.Parameters.AddWithValue("@ProjectID", _currentProjectId);
+                                command.Parameters.AddWithValue("@AddedByUserID", _currentUserId);
+
+                                command.ExecuteNonQuery(); 
+                            }
+
+                            transaction.Commit();
                             Logger.Log($"Successfully added abbreviation: {abbreviation}");
                             return true; 
-                        }
-                        else
+                        }catch (Exception ex)
                         {
-                            Logger.Log($"Failed to add abbreviation: {abbreviation}");
+                            transaction.Rollback();
+                            Logger.Log($"Error in transaction: {ex.Message}");
                             return false; 
                         }
                     }

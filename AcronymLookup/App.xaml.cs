@@ -187,8 +187,48 @@ namespace AcronymLookup
 
                 if (connected)
                 {
-                    int count = _databaseHandler.Count;
-                    Logger.Log($"Successfully connected to database with {count} abbreviation");
+
+                    string windowsUsername = System.Security.Principal.WindowsIdentity.GetCurrent().Name;
+                    Logger.Log($"current windows user: {windowsUsername}");
+
+                    int? userId = _databaseHandler.GetUserIdByWindowsUsername(windowsUsername);
+
+                    if (userId.HasValue)
+                    {
+                        Logger.Log($"Found user in database: UserID = {userId.Value}");
+
+                        int? projectId = _databaseHandler.GetUserFirstProject(userId.Value);
+
+                        if (projectId.HasValue)
+                        {
+                            _databaseHandler.SetUserContext(userId.Value, projectId.Value);
+
+                            int count = _databaseHandler.Count;
+                            Logger.Log("Successfully connected to database");
+                            Logger.Log($"User Context set: UserID={userId.Value}, ProjectID={projectId.Value}");
+                            Logger.Log($"Database has {count} total abbreviations");
+                        }
+                        else
+                        {
+                            Logger.Log("User has no projects assigned");
+                            MessageBox.Show(
+                                "you are not assigned to any projects, please contact administrator",
+                                "no projects found",
+                                MessageBoxButton.OK,
+                                MessageBoxImage.Warning);
+                            Shutdown();
+                        }
+                    }
+                    else
+                    {
+                        Logger.Log($"User not found in database: {windowsUsername}");
+                        MessageBox.Show(
+                            "your windows account is not registered in the system",
+                            "user not found",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning);
+                        Shutdown();
+                    }
                 }
                 else
                 {

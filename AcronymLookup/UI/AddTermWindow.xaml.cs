@@ -69,7 +69,7 @@ namespace AcronymLookup.UI
 
                 //get the valuses from input fields 
                 string abbreviation = AbbreviationInput.Text.Trim();
-                string definition = AbbreviationInput.Text.Trim();
+                string definition = DefinitionInput.Text.Trim();
                 string category = CategoryInput.Text.Trim();
                 string notes = NotesInput.Text.Trim();
 
