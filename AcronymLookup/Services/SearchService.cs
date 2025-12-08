@@ -208,7 +208,8 @@ namespace AcronymLookup.Services
                     item.Abbreviation,
                     item.Definition,
                     item.Category,
-                    item.Notes)); 
+                    item.Notes,
+                    item.Source)); 
             }
 
             //add project results 
@@ -218,7 +219,8 @@ namespace AcronymLookup.Services
                     item.Abbreviation,
                     item.Definition,
                     item.Category,
-                    item.Notes)); 
+                    item.Notes, 
+                    item.Source)); 
             }
 
             return allResults; 

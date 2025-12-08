@@ -197,7 +197,7 @@ namespace AcronymLookup.Core
                                 string notes = reader.IsDBNull(3) ? "" : reader.GetString(3);
 
                                 Logger.Log($"Found in database: {abbreviation}");
-                                return new AbbreviationData(abbreviation, definition, category, notes); 
+                                return new AbbreviationData(abbreviation, definition, category, notes, "Project"); 
                             }
                         }
                     }
@@ -243,7 +243,7 @@ namespace AcronymLookup.Core
                             string category = reader.IsDBNull(2) ? "" : reader.GetString(2);
                             string notes = reader.IsDBNull(3) ? "" : reader.GetString(3);
 
-                            results.Add(new AbbreviationData(abbreviation, definition, category, notes)); 
+                            results.Add(new AbbreviationData(abbreviation, definition, category, notes, "Project")); 
                         }
                     }
                 }

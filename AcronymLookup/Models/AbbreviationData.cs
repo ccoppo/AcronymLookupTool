@@ -34,6 +34,11 @@ namespace AcronymLookup.Models
         /// </summary>
         public string Notes { get; private set; }
 
+        /// <summary>
+        /// source of this abbreviation (personal, project, empty string) 
+        /// </summary>
+        public string Source {get; private set; }
+
         /// <summary> 
         /// When term was added (for tracking purposes)
         /// </summary>
@@ -50,7 +55,7 @@ namespace AcronymLookup.Models
         /// <param name="definition">The definition (required attribute) </param>
         /// <param name="category">Optional category</param>
         /// <param name="notes">Optional notes</param>
-        public AbbreviationData(string abbreviation, string definition, string category = "", string notes = "")
+        public AbbreviationData(string abbreviation, string definition, string category = "", string notes = "", string source = "")
         {
             // security: validate and clean all input 
             if (string.IsNullOrWhiteSpace(abbreviation))
@@ -70,6 +75,7 @@ namespace AcronymLookup.Models
             Definition = CleanText(definition);
             Category = CleanText(category);
             Notes = CleanText(notes);
+            Source = CleanText(source); 
             DateAdded = DateTime.Now;
         }
 

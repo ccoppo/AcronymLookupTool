@@ -72,7 +72,7 @@ namespace AcronymLookup.Services
                                 string notes = reader.IsDBNull(3) ? "" : reader.GetString(3);
 
                                 Logger.Log($"Found in personal database: {abbreviation}");
-                                return new AbbreviationData(abbreviation, definition, category, notes);
+                                return new AbbreviationData(abbreviation, definition, category, notes, "Personal");
                             }
                         }
                     }
@@ -93,7 +93,7 @@ namespace AcronymLookup.Services
             try
             {
                 string query = @"
-                    SELECT Abbreviation, Data, Category, Notes
+                    SELECT Abbreviation, Definition, Category, Notes
                     FROM PersonalAbbreviations 
                     WHERE UserID = @UserID
                         AND IsActive = 1
@@ -115,7 +115,7 @@ namespace AcronymLookup.Services
                                 string category = reader.IsDBNull(2) ? "" : reader.GetString(2);
                                 string notes = reader.IsDBNull(3) ? "" : reader.GetString(3);
 
-                                results.Add(new AbbreviationData(abbreviation, definition, category, notes));
+                                results.Add(new AbbreviationData(abbreviation, definition, category, notes, "Personal"));
                             }
                         }
                     }
