@@ -24,7 +24,6 @@ namespace AcronymLookup.UI
         #region Events 
 
         public event EventHandler<TermAddedEventArgs>? TermAdded;
-        private bool _canAddToProject; 
 
         #endregion
 
@@ -32,12 +31,13 @@ namespace AcronymLookup.UI
         #region Properties 
 
         private string? _initialSearchTerm;
+        private bool _canAddToProject; 
 
         #endregion
 
         #region Constructor 
 
-        public AddTermWindow(string? searchTerm = null)
+        public AddTermWindow(string? searchTerm = null, bool canAddToProject = false)
         {
             InitializeComponent();
 
@@ -113,7 +113,7 @@ namespace AcronymLookup.UI
                 Logger.Log($"Attempting to save term to {selectedDatabase} database");
 
 
-                var args = new TermAddedEventArgs(abbreviation, definition, category, notes);
+                var args = new TermAddedEventArgs(abbreviation, definition, category, notes, selectedDatabase);
                 TermAdded?.Invoke(this, args);
 
                 Logger.Log("Term saved successfully!");
@@ -184,8 +184,9 @@ namespace AcronymLookup.UI
             public string Definition { get; }
             public string Category { get; } 
             public string Notes { get; } 
+            public string TargetDatabase { get; }
 
-            public TermAddedEventArgs(string abbreviation, string definition, string category, string notes)
+            public TermAddedEventArgs(string abbreviation, string definition, string category, string notes, string targetDatabase)
             {
                 Abbreviation = abbreviation;
                 Definition = definition;
