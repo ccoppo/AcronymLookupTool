@@ -110,6 +110,30 @@ namespace AcronymLookup.UI
             AbbreviationText.Text = definition.Abbreviation;
             DefinitionText.Text = definition.Definition; 
 
+            if (!string.IsNullOrWhiteSpace(definition.Source))
+            {
+                SourceText.Text = definition.Source; 
+                SourceBadge.Visibility = Visibility.Visible; 
+                
+                //color code: green personal, blue project
+                if (definition.Source == "Personal")
+                {
+                    SourceBadge.Background = new System.Windows.Media.SolidColorBrush( 
+                        System.Windows.Media.Color.FromRgb(40, 167, 69)
+                    );
+                }
+                else if (definition.Source == "Project")
+                {
+                    SourceBadge.Background = new System.Windows.Media.SolidColorBrush( 
+                        System.Windows.Media.Color.FromRgb(0, 123, 255)
+                    );
+                }
+            }
+            else
+            {
+                SourceBadge.Visibility = Visibility.Collapsed; 
+            }
+
             //show category if present 
             if (!string.IsNullOrWhiteSpace(definition.Category))
             {
@@ -141,6 +165,7 @@ namespace AcronymLookup.UI
             DefinitionText.Visibility = Visibility.Collapsed;
             CategoryText.Visibility = Visibility.Collapsed;
             NotesContainer.Visibility = Visibility.Collapsed;
+            SourceBadge.Visibility = Visibility.Collapsed; 
 
             //show not found
             SearchTermText.Text = $"Searched For: {_searchTerm}";
@@ -157,6 +182,7 @@ namespace AcronymLookup.UI
             CategoryText.Visibility = Visibility.Collapsed;
             NotesContainer.Visibility = Visibility.Collapsed;
             NotFoundContainer.Visibility = Visibility.Collapsed;
+            SourceBadge.Visibility = Visibility.Collapsed; 
 
             this.Show(); 
         }

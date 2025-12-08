@@ -354,7 +354,7 @@ namespace AcronymLookup
                             Logger.Log($"  - {def.Abbreviation}: {def.Definition}");
                         }
 
-                        ShowLookupResult(definitions[0], null, searchTerm);
+                        ShowDefinitionBubble(searchTerm, definitions); 
                     }
                     else
                     {
@@ -383,7 +383,6 @@ namespace AcronymLookup
         {
             try
             {
-
                 //close any bubble 
                 CloseBubbleIfOpen(); 
 

@@ -83,12 +83,28 @@
 						  Margin="12,8,12,8">
 				<StackPanel>
 
-					<TextBlock Name="AbbreviationText"
-							   Text="API"
-							   FontSize="18"
-							   FontWeight="Bold"
-							   Foreground="#212529"
-							   Margin="0,0,0,4"/>
+					<StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+						<TextBlock Name="AbbreviationText"
+								   Text="API"
+								   FontSize="18"
+								   FontWeight="Bold"
+								   Foreground="#212529"
+								   VerticalAlignment="Center"
+								   Margin="0,0,8,0"/>
+						
+						<!-- source badge -->
+						<Border Name="SourceBadge"
+								Background="#007BFF"
+								CornerRadius="4"
+								Padding="6,2"
+								VerticalAlignment="Center"
+								Visibility="Collapsed">
+							<TextBlock Name="SourceText"
+									   Text="Project"
+									   FontSize="10"
+									   FontWeight="SemiBold"
+									   Foreground="White"/>
+						</Border>
 
 					<!--def display-->
 					<TextBlock Name ="DefinitionText"
