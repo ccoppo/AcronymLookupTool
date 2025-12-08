@@ -81,100 +81,101 @@
 						  VerticalScrollBarVisibility="Auto"
 						  HorizontalScrollBarVisibility="Disabled"
 						  Margin="12,8,12,8">
-				<StackPanel>
+                <StackPanel>
 
-					<StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-						<TextBlock Name="AbbreviationText"
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                        <TextBlock Name="AbbreviationText"
 								   Text="API"
 								   FontSize="18"
 								   FontWeight="Bold"
 								   Foreground="#212529"
 								   VerticalAlignment="Center"
 								   Margin="0,0,8,0"/>
-						
-						<!-- source badge -->
-						<Border Name="SourceBadge"
+
+                        <!-- source badge -->
+                        <Border Name="SourceBadge"
 								Background="#007BFF"
 								CornerRadius="4"
 								Padding="6,2"
 								VerticalAlignment="Center"
 								Visibility="Collapsed">
-							<TextBlock Name="SourceText"
+                            <TextBlock Name="SourceText"
 									   Text="Project"
 									   FontSize="10"
 									   FontWeight="SemiBold"
 									   Foreground="White"/>
-						</Border>
+                        </Border>
+                    </StackPanel>
 
-					<!--def display-->
-					<TextBlock Name ="DefinitionText"
-							   Text="Application Programming Interface"
-							   FontSize="14"
-							   Foreground="#495057"
-							   TextWrapping="Wrap"
-							   LineHeight="18"
-							   Margin="0,0,0,6"/>
-					<!--category display-->
-					<TextBlock Name="CategoryText"
-							   Text="Category: Software"
-							   FontSize="12"
-							   Foreground="#6C757D"
-							   FontStyle="Italic"
-							   Margin="0,0,0,4"
-							   Visibility="Collapsed"/>
+                    <!--def display-->
+                    <TextBlock Name ="DefinitionText"
+							Text="Application Programming Interface"
+							FontSize="14"
+							Foreground="#495057"
+							TextWrapping="Wrap"
+							LineHeight="18"
+							Margin="0,0,0,6"/>
+                    <!--category display-->
+                    <TextBlock Name="CategoryText"
+							Text="Category: Software"
+							FontSize="12"
+							Foreground="#6C757D"
+							FontStyle="Italic"
+							Margin="0,0,0,4"
+							Visibility="Collapsed"/>
 
-					<!--notes display-->
-					<Border Name="NotesContainer"
-							Background="#FFF3CD"
-							BorderBrush="#FFEAA7"
-							BorderThickness="1"
-							CornerRadius="4"
-							Padding="8"
-							Margin="0,2,0,0"
-							Visibility="Collapsed">
-						<StackPanel>
-							<TextBlock Text="Notes:"
-									   FontSize="12"
-									   FontWeight="SemiBold"
-									   Foreground="#856404"
-									   Margin="0,0,0,2"/>
-							<TextBlock Name="NotesText"
-									   Text="User Notes..."
-									   FontSize="11"
-									   Foreground="#856404"
-									   TextWrapping="Wrap"/>
-						</StackPanel>
-					</Border>
+                    <!--notes display-->
+                    <Border Name="NotesContainer"
+						Background="#FFF3CD"
+						BorderBrush="#FFEAA7"
+						BorderThickness="1"
+						CornerRadius="4"
+						Padding="8"
+						Margin="0,2,0,0"
+						Visibility="Collapsed">
+                        <StackPanel>
+                            <TextBlock Text="Notes:"
+									FontSize="12"
+									FontWeight="SemiBold"
+									Foreground="#856404"
+									Margin="0,0,0,2"/>
+                            <TextBlock Name="NotesText"
+									Text="User Notes..."
+									FontSize="11"
+									Foreground="#856404"
+									TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
 
-					<!--not found message-->
-					<Border Name="NotFoundContainer"
-							Background="#F8D7DA"
-							BorderBrush="#F5C6CB"
-							BorderThickness="1"
-							CornerRadius="6"
-							Padding="16"
-							Visibility="Collapsed">
-						<StackPanel HorizontalAlignment="Center">
-							<TextBlock Text="!!! Term Not Found"
-									   FontSize ="16"
-									   FontWeight="SemiBold"
-									   Foreground="#721C24"
-									   HorizontalAlignment="Center"
-									   Margin="0,0,0,6"/>
-							<TextBlock Name="SearchTermText"
-									   Text="Searched for: XYZ"
-									   FontSize="13"
-									   Foreground="#721C24"
-									   HorizontalAlignment="Center"
-									   Margin="0,0,0,6"/>
-							<TextBlock Text="Click + to add this term"
-									   FontSize="12"
-									   Foreground="#721C24"
-									   HorizontalAlignment="Center"/>
-						</StackPanel>
-					</Border>
-				</StackPanel>
-			</ScrollViewer>
+                    <!--not found message-->
+                    <Border Name="NotFoundContainer"
+						Background="#F8D7DA"
+						BorderBrush="#F5C6CB"
+						BorderThickness="1"
+						CornerRadius="6"
+						Padding="16"
+						Visibility="Collapsed">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="!!! Term Not Found"
+									FontSize ="16"
+									FontWeight="SemiBold"
+									Foreground="#721C24"
+									HorizontalAlignment="Center"
+									Margin="0,0,0,6"/>
+                            <TextBlock Name="SearchTermText"
+									Text="Searched for: XYZ"
+									FontSize="13"
+									Foreground="#721C24"
+									HorizontalAlignment="Center"
+									Margin="0,0,0,6"/>
+                            <TextBlock Text="Click + to add this term"
+									FontSize="12"
+									Foreground="#721C24"
+									HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
 
 			<!--footer buttons-->
 			<Grid Grid.Row="2"
