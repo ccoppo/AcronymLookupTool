@@ -12,6 +12,7 @@ using System.Windows;
 using static AcronymLookup.Services.ClipboardHandler;
 using static AcronymLookup.UI.DefinitionBubble;
 using static AcronymLookup.UI.AddTermWindow; 
+using static AcronymLookup.UI.EditTermWindow; 
 //using AcronymLookup.UI; 
 
 namespace AcronymLookup
@@ -421,6 +422,8 @@ namespace AcronymLookup
                 //subscribe to bubble events 
                 _currentBubble.BubbleClosed += OnBubbleClosed;
                 _currentBubble.AddTermRequested += OnAddTermRequested;
+                _currentBubble.EditTermRequested += OnEditTermRequested;
+                _currentBubble.DeleteTermRequested += OnDeleteTermRequested;
 
                 //show the bubble with results
                 _currentBubble.ShowDefinition(searchTerm, definitions);
@@ -465,6 +468,8 @@ namespace AcronymLookup
                 {
                     _currentBubble.BubbleClosed -= OnBubbleClosed;
                     _currentBubble.AddTermRequested -= OnAddTermRequested;
+                    _currentBubble.EditTermRequested -= OnEditTermRequested;
+                    _currentBubble.DeleteTermRequested -= OnDeleteTermRequested;
                     _currentBubble.CloseBubble();
                     _currentBubble = null; 
                 }
@@ -487,6 +492,9 @@ namespace AcronymLookup
                 {
                     _currentBubble.BubbleClosed -= OnBubbleClosed;
                     _currentBubble.AddTermRequested -= OnAddTermRequested;
+                    _currentBubble.EditTermRequested -= OnEditTermRequested; 
+                    _currentBubble.DeleteTermRequested -= OnDeleteTermRequested; 
+
                     _currentBubble = null; 
                 }
             }catch (Exception ex)
@@ -618,6 +626,284 @@ namespace AcronymLookup
                     MessageBoxImage.Error);
             }
         }
+
+        /// <summary>
+        /// Handles edit term request from definition bubble
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void OnEditTermRequested(object? sender, DefinitionBubble.EditTermEventArgs e)
+        {
+            try
+            {
+                Logger.Log($"Edit requested for '{e.Term.Abbreviation}'");
+
+                if (_databaseHandler == null || _permissionService == null || _personalDatabaseService == null)
+                {
+                    Logger.Log("Required services not available");
+                    MessageBox.Show(
+                        "Service not available",
+                        "Error",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                    return;
+                }
+
+                int userId = _databaseHandler.CurrentUserId;
+                int projectId = _databaseHandler.CurrentProjectId;
+
+                // Check if this is a personal term
+                var personalTerm = _personalDatabaseService.FindPersonalAbbreviation(e.Term.Abbreviation, userId);
+                bool isPersonalTerm = personalTerm != null;
+
+                // Check permissions for project terms
+                bool canEditProject = _permissionService.CanEditTermsDirectly(userId, projectId);
+
+                // Determine if user can edit this term
+                bool canEdit = isPersonalTerm || canEditProject;
+
+                if (!canEdit)
+                {
+                    Logger.Log($"User does not have permission to edit '{e.Term.Abbreviation}'");
+                    MessageBox.Show(
+                        $"You don't have permission to edit project terms.\n\n" +
+                        $"You can only edit terms in your personal database.",
+                        "Permission Denied",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                // Show edit window
+                var editWindow = new EditTermWindow(e.Term, isPersonalTerm);
+                editWindow.TermEdited += OnTermEdited;
+
+                bool? result = editWindow.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error handling edit request: {ex.Message}");
+                MessageBox.Show(
+                    $"Error: {ex.Message}",
+                    "Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// Handles the actual term editing after user confirms changes
+        /// </summary>
+        private void OnTermEdited(object? sender, EditTermWindow.TermEditedEventArgs e)
+        {
+            try
+            {
+                Logger.Log($"Saving edits for '{e.Abbreviation}'");
+
+                if (_databaseHandler == null || _personalDatabaseService == null)
+                {
+                    Logger.Log("Required services not available");
+                    return;
+                }
+
+                int userId = _databaseHandler.CurrentUserId;
+                bool success;
+
+                if (e.IsPersonalTerm)
+                {
+                    // Update personal database
+                    success = _personalDatabaseService.UpdatePersonalAbbreviation(
+                        userId,
+                        e.Abbreviation,
+                        e.NewDefinition,
+                        e.NewCategory,
+                        e.NewNotes);
+
+                    if (success)
+                    {
+                        Logger.Log($"Updated personal term '{e.Abbreviation}'");
+                        MessageBox.Show(
+                            $"Personal term '{e.Abbreviation}' updated successfully!",
+                            "Success",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        Logger.Log($"Failed to update personal term '{e.Abbreviation}'");
+                        MessageBox.Show(
+                            "Failed to update personal term.",
+                            "Update Failed",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning);
+                    }
+                }
+                else
+                {
+                    // Update project database
+                    success = _databaseHandler.UpdateAbbreviation(
+                        e.Abbreviation,
+                        e.NewDefinition,
+                        e.NewCategory,
+                        e.NewNotes,
+                        userId,
+                        "User edit");
+
+                    if (success)
+                    {
+                        Logger.Log($"Updated project term '{e.Abbreviation}'");
+                        MessageBox.Show(
+                            $"Project term '{e.Abbreviation}' updated successfully!",
+                            "Success",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        Logger.Log($"Failed to update project term '{e.Abbreviation}'");
+                        MessageBox.Show(
+                            "Failed to update project term.",
+                            "Update Failed",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning);
+                    }
+                }
+
+                // Close the bubble to refresh
+                CloseBubbleIfOpen();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error saving term edits: {ex.Message}");
+                MessageBox.Show(
+                    $"Error saving changes: {ex.Message}",
+                    "Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// Handles delete term request from the definition bubble 
+        /// Checks permissions and deleted appropriate database 
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void OnDeleteTermRequested(object? sender, DefinitionBubble.DeleteTermEventArgs e)
+        {
+            try
+            {
+                Logger.Log($"Delete requested for '{e.Term.Abbreviation}'");
+
+                if (_databaseHandler == null || _permissionService == null || _personalDatabaseService == null)
+                {
+                    Logger.Log("Required services not available");
+                    MessageBox.Show(
+                        "Service not available",
+                        "Error",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                    return;
+                }
+
+                int userId = _databaseHandler.CurrentUserId;
+                int projectId = _databaseHandler.CurrentProjectId;
+
+                // Check if this is a personal term
+                var personalTerm = _personalDatabaseService.FindPersonalAbbreviation(e.Term.Abbreviation, userId);
+                bool isPersonalTerm = personalTerm != null;
+
+                // Check permissions for project terms
+                bool canDeleteProject = _permissionService.CanDeleteTermsDirectly(userId, projectId);
+
+                // Determine if user can delete this term
+                bool canDelete = isPersonalTerm || canDeleteProject;
+
+                if (!canDelete)
+                {
+                    Logger.Log($"User does not have permission to delete '{e.Term.Abbreviation}'");
+                    MessageBox.Show(
+                        $"You don't have permission to delete project terms.\n\n" +
+                        $"You can only delete terms in your personal database.",
+                        "Permission Denied",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                // Perform deletion
+                bool success;
+
+                if (isPersonalTerm)
+                {
+                    // Delete from personal database
+                    success = _personalDatabaseService.DeletePersonalAbbreviation(userId, e.Term.Abbreviation);
+
+                    if (success)
+                    {
+                        Logger.Log($"Deleted personal term '{e.Term.Abbreviation}'");
+                        MessageBox.Show(
+                            $"Personal term '{e.Term.Abbreviation}' deleted successfully!",
+                            "Success",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Information);
+
+                        // Close bubble
+                        CloseBubbleIfOpen();
+                    }
+                    else
+                    {
+                        Logger.Log($"Failed to delete personal term '{e.Term.Abbreviation}'");
+                        MessageBox.Show(
+                            "Failed to delete personal term.",
+                            "Delete Failed",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning);
+                    }
+                }
+                else
+                {
+                    // Delete from project database
+                    success = _databaseHandler.DeleteAbbreviation(
+                        e.Term.Abbreviation,
+                        userId,
+                        "User deleted term");
+
+                    if (success)
+                    {
+                        Logger.Log($"Deleted project term '{e.Term.Abbreviation}'");
+                        MessageBox.Show(
+                            $"Project term '{e.Term.Abbreviation}' deleted successfully!",
+                            "Success",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Information);
+
+                        // Close bubble
+                        CloseBubbleIfOpen();
+                    }
+                    else
+                    {
+                        Logger.Log($"Failed to delete project term '{e.Term.Abbreviation}'");
+                        MessageBox.Show(
+                            "Failed to delete project term.",
+                            "Delete Failed",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error handling delete request: {ex.Message}");
+                MessageBox.Show(
+                    $"Error deleting term: {ex.Message}",
+                    "Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+
 
         #endregion
 

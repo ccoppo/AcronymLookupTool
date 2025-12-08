@@ -162,9 +162,13 @@
 
 			<!--footer buttons-->
 			<Grid Grid.Row="2"
-				  Background="#F8F9FA"
-				  Height="40">
+				Background="#F8F9FA"
+				Height="40">
 				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="Auto"/>
+					<ColumnDefinition Width="*"/>
+					<ColumnDefinition Width="Auto"/>
+					<ColumnDefinition Width="*"/>
 					<ColumnDefinition Width="Auto"/>
 					<ColumnDefinition Width="*"/>
 					<ColumnDefinition Width="Auto"/>
@@ -172,7 +176,7 @@
 					<ColumnDefinition Width="Auto"/>
 				</Grid.ColumnDefinitions>
 
-				<!--previous term button-->
+				<!-- *** PREVIOUS BUTTON *** -->
 				<Button Grid.Column="0"
 						Name="PreviousButton"
 						Content="&lt;"
@@ -185,7 +189,7 @@
 						FontSize="12"
 						Cursor="Hand"
 						Click="PreviousButton_Click"
-						ToolTip="Previous (Alt+Left)"
+						ToolTip="Previous definition"
 						IsEnabled="False">
 					<Button.Style>
 						<Style TargetType="Button">
@@ -194,16 +198,76 @@
 									<Setter Property="Background" Value="#5A6268"/>
 								</Trigger>
 								<Trigger Property="IsEnabled" Value="False">
-									<Setter Property ="Background" Value="#ADB5BD"/>
-									<Setter Property ="Cursor" Value="Arrow"/>
+									<Setter Property="Background" Value="#ADB5BD"/>
+									<Setter Property="Cursor" Value="Arrow"/>
 								</Trigger>
 							</Style.Triggers>
 						</Style>
 					</Button.Style>
 				</Button>
 
-				<!--add term button-->
+				<!-- *** EDIT BUTTON (NEW) *** -->
 				<Button Grid.Column="2"
+						Name="EditButton"
+						Content="✎"
+						Width="32"
+						Height="28"
+						Margin="4,6,4,6"
+						Background="#007BFF"
+						Foreground="White"
+						BorderThickness="0"
+						FontSize="14"
+						FontWeight="Bold"
+						Cursor="Hand"
+						Click="EditButton_Click"
+						ToolTip="Edit term">
+					<Button.Style>
+						<Style TargetType="Button">
+							<Style.Triggers>
+								<Trigger Property="IsMouseOver" Value="True">
+									<Setter Property="Background" Value="#0056B3"/>
+								</Trigger>
+								<Trigger Property="IsEnabled" Value="False">
+									<Setter Property="Background" Value="#ADB5BD"/>
+									<Setter Property="Cursor" Value="Arrow"/>
+								</Trigger>
+							</Style.Triggers>
+						</Style>
+					</Button.Style>
+				</Button>
+
+				<!-- *** DELETE BUTTON (NEW) *** -->
+				<Button Grid.Column="4"
+						Name="DeleteButton"
+						Content="🗑"
+						Width="32"
+						Height="28"
+						Margin="4,6,4,6"
+						Background="#DC3545"
+						Foreground="White"
+						BorderThickness="0"
+						FontSize="14"
+						FontWeight="Bold"
+						Cursor="Hand"
+						Click="DeleteButton_Click"
+						ToolTip="Delete term">
+					<Button.Style>
+						<Style TargetType="Button">
+							<Style.Triggers>
+								<Trigger Property="IsMouseOver" Value="True">
+									<Setter Property="Background" Value="#C82333"/>
+								</Trigger>
+								<Trigger Property="IsEnabled" Value="False">
+									<Setter Property="Background" Value="#ADB5BD"/>
+									<Setter Property="Cursor" Value="Arrow"/>
+								</Trigger>
+							</Style.Triggers>
+						</Style>
+					</Button.Style>
+				</Button>
+
+				<!-- *** ADD BUTTON *** -->
+				<Button Grid.Column="6"
 						Name="AddButton"
 						Content="+"
 						Width="32"
@@ -216,7 +280,7 @@
 						FontWeight="Bold"
 						Cursor="Hand"
 						Click="AddButton_Click"
-						ToolTip="Add term (Ctrl+A)">
+						ToolTip="Add new term">
 					<Button.Style>
 						<Style TargetType="Button">
 							<Style.Triggers>
@@ -228,8 +292,8 @@
 					</Button.Style>
 				</Button>
 
-				<!--next term button-->
-				<Button Grid.Column="4"
+				<!-- *** NEXT BUTTON *** -->
+				<Button Grid.Column="8"
 						Name="NextButton"
 						Content="&gt;"
 						Width="32"
@@ -241,12 +305,15 @@
 						FontSize="12"
 						Cursor="Hand"
 						Click="NextButton_Click"
-						ToolTip="Next (Alt+Right)"
+						ToolTip="Next definition"
 						IsEnabled="False">
 					<Button.Style>
 						<Style TargetType="Button">
 							<Style.Triggers>
 								<Trigger Property="IsMouseOver" Value="True">
+									<Setter Property="Background" Value="#5A6268"/>
+								</Trigger>
+								<Trigger Property="IsEnabled" Value="False">
 									<Setter Property="Background" Value="#ADB5BD"/>
 									<Setter Property="Cursor" Value="Arrow"/>
 								</Trigger>

@@ -20,6 +20,10 @@ namespace AcronymLookup.UI
 
         public event EventHandler? BubbleClosed;
 
+        public event EventHandler<EditTermEventArgs>? EditTermRequested; 
+
+        public event EventHandler <DeleteTermEventArgs>? DeleteTermRequested; 
+
         #endregion
 
         public DefinitionBubble()
@@ -301,6 +305,67 @@ namespace AcronymLookup.UI
             }
         }
 
+        private void EditButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (!_currentDefinitions.Any() || _currentDefinitionIndex >= _currentDefinitions.Count)
+                {
+                    Logger.Log("No term to edit");
+                    return;
+                }
+
+                var currentTerm = _currentDefinitions[_currentDefinitionIndex];
+                Logger.Log($"Edit button clicked for '{currentTerm.Abbreviation}'");
+
+                var args = new EditTermEventArgs(currentTerm);
+                EditTermRequested?.Invoke(this, args);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error handling edit button: {ex.Message}");
+            }
+        }
+
+        private void DeleteButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (!_currentDefinitions.Any() || _currentDefinitionIndex >= _currentDefinitions.Count)
+                {
+                    Logger.Log("No term to delete");
+                    return;
+                }
+
+                var currentTerm = _currentDefinitions[_currentDefinitionIndex];
+                Logger.Log($"Delete button clicked for '{currentTerm.Abbreviation}'");
+
+                // Show confirmation dialog
+                var result = MessageBox.Show(
+                    $"Are you sure you want to delete '{currentTerm.Abbreviation}'?\n\n" +
+                    $"Definition: {currentTerm.Definition}\n\n" +
+                    $"This action cannot be undone.",
+                    "Confirm Delete",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning);
+
+                if (result == MessageBoxResult.Yes)
+                {
+                    Logger.Log($"User confirmed deletion of '{currentTerm.Abbreviation}'");
+                    var args = new DeleteTermEventArgs(currentTerm);
+                    DeleteTermRequested?.Invoke(this, args);
+                }
+                else
+                {
+                    Logger.Log("User cancelled deletion");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error handling delete button: {ex.Message}");
+            }
+        }
+
         protected override void OnClosed(EventArgs e)
         {
             BubbleClosed?.Invoke(this, EventArgs.Empty);
@@ -323,13 +388,28 @@ namespace AcronymLookup.UI
                 SearchTerm = searchTerm;
                 HasExistingDefinitions = hasExistingDefinitions; 
             }
+            
         }
 
+        public class EditTermEventArgs : EventArgs
+        {
+            public AbbreviationData Term { get; }
 
+            public EditTermEventArgs(AbbreviationData term)
+            {
+                Term = term;
+            }
+        }
+
+        public class DeleteTermEventArgs : EventArgs
+        {
+            public AbbreviationData Term { get; }
+
+            public DeleteTermEventArgs(AbbreviationData term)
+            {
+                Term = term;
+            }
+        }
+        #endregion
     }
-
-    #endregion 
-
-
-
 }
