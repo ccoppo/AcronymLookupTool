@@ -10,7 +10,7 @@ namespace AcronymLookup.UI
 {
     public partial class DefinitionBubble : Window
     {
-        private List<SearchResultItem> _currentDefinitions;
+        private List<AbbreviationData> _currentDefinitions;
         private int _currentDefinitionIndex;
         private string _searchTerm;
 
@@ -41,14 +41,14 @@ namespace AcronymLookup.UI
 
         #region Public Methods 
 
-        public void ShowDefinition(string searchTerm, List<SearchResultItem> definitions)
+        public void ShowDefinition(string searchTerm, List<AbbreviationData> definitions)
         {
             try
             {
                 Logger.Log($"Showing definition for: '{searchTerm}'");
 
                 _searchTerm = searchTerm;
-                _currentDefinitions = definitions ?? new List<SearchResultsItem>();
+                _currentDefinitions = definitions ?? new List<AbbreviationData>();
                 _currentDefinitionIndex = 0;
 
                 if (_currentDefinitions.Any())
@@ -99,39 +99,16 @@ namespace AcronymLookup.UI
 
         #region Private Display Methods 
 
-        /// <summary>
-        /// Displays current definition 
-        /// </summary>
         private void DisplayCurrentDefinition()
         {
             if (!_currentDefinitions.Any() || _currentDefinitionIndex >= _currentDefinitions.Count)
                 return; 
 
-            var definition = _currentDefinitions[_currentDefinitionIndex];
+            var definition = _currentDefinitions[ _currentDefinitionIndex ];
 
             //show main content 
             AbbreviationText.Text = definition.Abbreviation;
             DefinitionText.Text = definition.Definition; 
-
-            // set source indicator (Personal = Green, Project = Blue)
-            if (definition.Source == "Personal")
-            {
-                SourceIndicator.Background = new System.Windows.Media.SolidColorBrush(
-                    System.Windows.Media.Color.FromRgb(40, 167, 69)); // Green
-                SourceText.Text = "PERSONAL";
-                SourceIndicator.Visibility = Visibility.Visible;
-            }
-            else if (definition.Source == "Project")
-            {
-                SourceIndicator.Background = new System.Windows.Media.SolidColorBrush(
-                    System.Windows.Media.Color.FromRgb(0, 123, 255)); // Blue
-                SourceText.Text = "PROJECT";
-                SourceIndicator.Visibility = Visibility.Visible;
-            }
-            else
-            {
-                SourceIndicator.Visibility = Visibility.Collapsed;
-            }
 
             //show category if present 
             if (!string.IsNullOrWhiteSpace(definition.Category))
@@ -145,22 +122,20 @@ namespace AcronymLookup.UI
             }
 
             //show notes if available 
-            if (!string.IsNullOrWhiteSpace(definition.Notes))
+            if (definition.HasNotes)
             {
                 NotesText.Text = definition.Notes;
                 NotesContainer.Visibility = Visibility.Visible; 
             }
             else
             {
-                NotesContainer.Visibility = Visibility.Collapsed; 
+                NotesContainer.Visibility = Visibility.Visible; 
             }
-            
             Logger.Log($"Displayed definition {_currentDefinitionIndex + 1}/{_currentDefinitions.Count}"); 
         }
 
         private void ShowNotFoundMessage()
         {
-            SourceIndicator.Visibility = Visibility.Collapsed; 
             //hide main content 
             AbbreviationText.Visibility = Visibility.Collapsed;
             DefinitionText.Visibility = Visibility.Collapsed;

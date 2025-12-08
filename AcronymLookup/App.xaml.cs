@@ -310,7 +310,7 @@ namespace AcronymLookup
                     Logger.Log($"Text capture failed: {e.ErrorMessage}");
 
                     // Show error to user
-                    ShowLookupResult(null, e.ErrorMessage ?? "Failed to capture text");
+                    ShowLookupResult(null, e.ErrorMessage ?? "Failed to capture text", null);
                 }
             }
             catch (Exception ex)
@@ -346,10 +346,7 @@ namespace AcronymLookup
                     if (searchResult.HasResults)
                     {
                         // Convert search results to AbbreviationData list
-                        //var definitions = SearchService.GetAllResultsAsList(searchResult);
-                        var definitions = new List<SearchResult>(); 
-                        definitions.AddRange(searchResult.PersonalResults); 
-                        definitions.AddRange(searchResult.ProjectResults); 
+                        var definitions = SearchService.GetAllResultsAsList(searchResult);
                         
                         Logger.Log($"Found {definitions.Count} definition(s):");
                         foreach (var def in definitions)
@@ -357,24 +354,24 @@ namespace AcronymLookup
                             Logger.Log($"  - {def.Abbreviation}: {def.Definition}");
                         }
 
-                        ShowDefinitionBubble(searchTerm, definition);
+                        ShowLookupResult(definitions[0], null, searchTerm);
                     }
                     else
                     {
                         Logger.Log($"Not found: '{searchTerm}'");
-                        ShowLookupResult(searchTerm, $"'{searchTerm}' not found in any database");
+                        ShowLookupResult(null, $"'{searchTerm}' not found in any database", searchTerm);
                     }
                 }
                 else
                 {
                     Logger.Log("SearchService or DatabaseHandler not available");
-                    ShowLookupResult(null, "Service not initialized");
+                    ShowLookupResult(null, "Service not initialized", null);
                 }
             }
             catch (Exception ex)
             {
                 Logger.Log($"Error during lookup: {ex.Message}");
-                ShowLookupResult(null, $"Lookup error: {ex.Message}");
+                ShowLookupResult(null, $"Lookup error: {ex.Message}", null);
             }
         }
 
@@ -382,26 +379,6 @@ namespace AcronymLookup
         /// Shows the lookup result to the user
         /// TODO: Later this will show the bubble UI - for now just console + message box
         /// </summary>
-        /// 
-        private void ShowLookupResult(string searchTerm, string? errorMessage = null)
-        {
-            try
-            {
-                //close any bubble 
-                CloseBubbleIfOpen(); 
-
-                Logger.Log($"showing error to user: {errorMessage}");
-
-                var emptyList = new List<SearchResultItem>();
-                ShowDefinitionBubble(searchTerm, emptyList); 
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Error showing result: {ex.Message}");
-            }
-        }
-
-        /*
         private void ShowLookupResult(AbbreviationData? result, string? errorMessage, string? searchTerm = null)
         {
             try
@@ -431,13 +408,12 @@ namespace AcronymLookup
                 Logger.Log($"Error showing result: {ex.Message}");
             }
         }
-        */
 
         #endregion
 
         #region BubbleManagement
 
-        private void ShowDefinitionBubble(string searchTerm, List<SearchResultItem> definitions)
+        private void ShowDefinitionBubble(string searchTerm, List<AbbreviationData> definitions)
         {
             try
             {
@@ -463,7 +439,7 @@ namespace AcronymLookup
         {
             try
             {
-                var emptyList = new List<SearchResultItem>(); 
+                var emptyList = new List<AbbreviationData>();
 
                 ShowDefinitionBubble("No text selected", emptyList); 
             }catch (Exception ex)
@@ -476,7 +452,7 @@ namespace AcronymLookup
         {
             try
             {
-                var emptyList = new List<SearchResultItem>();
+                var emptyList = new List<AbbreviationData>();
                 ShowDefinitionBubble(errorMessage, emptyList); 
             }catch(Exception ex) 
             {
