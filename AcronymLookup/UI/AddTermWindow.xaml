@@ -108,6 +108,29 @@
                        Margin="0,0,0,15"
                        Visibility="Collapsed"/>
 
+            <!-- Database Selection -->
+            <StackPanel Grid.Row="5" Margin="0,0,0,15">
+                <TextBlock Text="Save To:"
+                           FontSize="14"
+                           FontWeight="SemiBold"
+                           Foreground="#495057"
+                           Margin="0,0,0,5"/>
+                <ComboBox Name="DatabaseSelector"
+                          Height="32"
+                          FontSize="14"
+                          SelectedIndex="0">
+                    <ComboBoxItem Content="Personal Database (Private)" Tag="Personal"/>
+                    <ComboBoxItem Content="Project Database (Shared)" Tag="Project"/>
+                </ComboBox>
+                <TextBlock Name="PermissionWarning"
+                           Text="You don't have permission to add to Project - this will create a request for approval"
+                           FontSize="11"
+                           Foreground="#856404"
+                           TextWrapping="Wrap"
+                           Margin="0,4,0,0"
+                           Visibility="Collapsed"/>
+            </StackPanel>
+
             <!-- Buttons -->
             <Grid Grid.Row="6" Margin="0,10,0,0">
                 <Grid.ColumnDefinitions>

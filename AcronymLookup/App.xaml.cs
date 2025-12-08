@@ -508,6 +508,15 @@ namespace AcronymLookup
             {
                 Logger.Log($"Add term requested for '{e.SearchTerm}'");
 
+                // Check if user can add to project
+                bool canAddToProject = false;
+                if (_databaseHandler != null && _permissionService != null)
+                {
+                    int userId = _databaseHandler.CurrentUserId;
+                    int projectId = _databaseHandler.CurrentProjectId;
+                    canAddToProject = _permissionService.CanAddTermsDirectly(userId, projectId);
+                }
+
                 var addTermWindow = new AddTermWindow(e.SearchTerm);
 
                 //subscribe to the term added event
@@ -528,86 +537,90 @@ namespace AcronymLookup
         {
             try
             {
-                Logger.Log($"Saving term to database: {e.Abbreviation}");
+                Logger.Log($"Saving term '{e.Abbreviation}' to {e.TargetDatabase} database");
 
-                if (_databaseHandler != null && _permissionService != null)
+                if (_databaseHandler != null && _permissionService != null && _personalDatabaseService != null)
                 {
                     int userId = _databaseHandler.CurrentUserId;
                     int projectId = _databaseHandler.CurrentProjectId;
 
-                    // CHECK PERMISSIONS USING PERMISSIONSERVICE 
-                    bool canAddDirectly = _permissionService.CanAddTermsDirectly(userId, projectId);
-
-                    if (canAddDirectly)
+                    if (e.TargetDatabase == "Personal")
                     {
-                        //user has permission - add directly to project database
-                        bool success = _databaseHandler.AddAbbreviation(
+                        //user chose Personal database
+                        bool success = _personalDatabaseService.AddPersonalAbbreviation(
+                            userId,
                             e.Abbreviation,
                             e.Definition,
                             e.Category,
-                            e.Notes,
-                            "User");
+                            e.Notes);
 
                         if (success)
                         {
-                            Logger.Log($"Term '{e.Abbreviation}' added to PROJECT database");
+                            Logger.Log($"Term '{e.Abbreviation}' added to PERSONAL database");
                             MessageBox.Show(
-                                $"Term '{e.Abbreviation}' added successfully to project database!",
+                                $"Term '{e.Abbreviation}' added to your personal database!",
                                 "Success",
                                 MessageBoxButton.OK,
                                 MessageBoxImage.Information);
                         }
                         else
                         {
-                            Logger.Log($"Failed to save term '{e.Abbreviation}' to project database");
+                            Logger.Log($"Failed to save term to personal database");
                             MessageBox.Show(
-                                $"Failed to save term. Term may already exist.",
+                                "Failed to save term. Term may already exist in your personal database.",
                                 "Save Failed",
                                 MessageBoxButton.OK,
                                 MessageBoxImage.Warning);
                         }
                     }
-                    else
+                    else if (e.TargetDatabase == "Project")
                     {
-                        //user doesn't have permission - add to personal database instead 
-                        if (_personalDatabaseService != null)
+                        //user chose Project database - check permissions first
+                        bool canAddDirectly = _permissionService.CanAddTermsDirectly(userId, projectId);
+
+                        if (canAddDirectly)
                         {
-                            bool success = _personalDatabaseService.AddPersonalAbbreviation(
-                                userId,
+                            // User has permission - add directly to project
+                            bool success = _databaseHandler.AddAbbreviation(
                                 e.Abbreviation,
                                 e.Definition,
                                 e.Category,
-                                e.Notes);
+                                e.Notes,
+                                "User");
 
                             if (success)
                             {
-                                Logger.Log($"Term '{e.Abbreviation}' added to PERSONAL database (no project permissions)");
+                                Logger.Log($"Term '{e.Abbreviation}' added to PROJECT database");
                                 MessageBox.Show(
-                                    $"Term '{e.Abbreviation}' added to your personal database.\n\n" +
-                                    $"You don't have permission to add terms directly to the project.\n" +
-                                    $"Would you like to request approval to add it to the project?",
-                                    "Added to Personal Database",
-                                    MessageBoxButton.YesNo,
-                                    MessageBoxImage.Question);
-                                
-                                // TODO: If user clicks Yes, create a TermRequest
-                                // Priority 2B (Request/Approval Workflow)
+                                    $"Term '{e.Abbreviation}' added successfully to project database!",
+                                    "Success",
+                                    MessageBoxButton.OK,
+                                    MessageBoxImage.Information);
                             }
                             else
                             {
-                                Logger.Log($"Failed to save term to personal database");
+                                Logger.Log($"Failed to save term to project database");
                                 MessageBox.Show(
-                                    $"Failed to save term to personal database.",
+                                    "Failed to save term. Term may already exist in project database.",
                                     "Save Failed",
                                     MessageBoxButton.OK,
                                     MessageBoxImage.Warning);
                             }
                         }
+                        else
+                        {
+                            // User doesn't have permission, this shouldn't happen if UI is configured correctly
+                            Logger.Log($"User tried to add to project without permission");
+                            MessageBox.Show(
+                                "You don't have permission to add terms directly to the project database.",
+                                "Permission Denied",
+                                MessageBoxButton.OK,
+                                MessageBoxImage.Warning);
+                        }
                     }
-                }
-                else
+                } else
                 {
-                    Logger.Log("Database Handler or Permission Service not available");
+                    Logger.Log("Required services not available");
                     MessageBox.Show(
                         "Database connection is not available",
                         "Error",

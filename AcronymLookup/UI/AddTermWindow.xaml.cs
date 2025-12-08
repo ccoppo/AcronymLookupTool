@@ -24,6 +24,7 @@ namespace AcronymLookup.UI
         #region Events 
 
         public event EventHandler<TermAddedEventArgs>? TermAdded;
+        private bool _canAddToProject; 
 
         #endregion
 
@@ -41,6 +42,7 @@ namespace AcronymLookup.UI
             InitializeComponent();
 
             _initialSearchTerm = searchTerm;
+            _canAddToProject = canAddToProject;
 
             //if a search term provided, pre-fill the abbreviation field 
             if (!string.IsNullOrWhiteSpace(searchTerm))
@@ -49,10 +51,42 @@ namespace AcronymLookup.UI
 
                 //move focus to abbreviation input 
                 AbbreviationInput.Focus();
+
+                ConfigureDatabaseSelection();
             }
             Logger.Log("Add Term window opened"); 
         }
 
+
+        #endregion
+
+        #region Database Selection
+
+        /// <summary>
+        /// Configures the database selector based on user permissions
+        /// </summary>
+        private void ConfigureDatabaseSelection()
+        {
+            if (_canAddToProject)
+            {
+                // User can add to project - both options available
+                DatabaseSelector.IsEnabled = true;
+                PermissionWarning.Visibility = Visibility.Collapsed;
+                Logger.Log("User can add to both Personal and Project databases");
+            }
+            else
+            {
+                // User can't add to project directly - show warning
+                DatabaseSelector.SelectedIndex = 0; // Force "Personal" selection
+                PermissionWarning.Visibility = Visibility.Visible;
+                
+                // Disable the "Project" option
+                var projectItem = (ComboBoxItem)DatabaseSelector.Items[1];
+                projectItem.IsEnabled = false;
+                
+                Logger.Log("User can only add to Personal database (no project permissions)");
+            }
+        }
 
         #endregion
 
@@ -73,7 +107,11 @@ namespace AcronymLookup.UI
                 string category = CategoryInput.Text.Trim();
                 string notes = NotesInput.Text.Trim();
 
-                Logger.Log($"Attempting to save term");
+                var selectedItem = (ComboBoxItem)DatabaseSelector.SelectedItem;
+                string selectedDatabase = selectedItem.Tag.ToString() ?? "Personal";
+                
+                Logger.Log($"Attempting to save term to {selectedDatabase} database");
+
 
                 var args = new TermAddedEventArgs(abbreviation, definition, category, notes);
                 TermAdded?.Invoke(this, args);
@@ -153,6 +191,7 @@ namespace AcronymLookup.UI
                 Definition = definition;
                 Category = category;
                 Notes = notes;
+                TargetDatabase = targetDatabase;
             }
         }
 
