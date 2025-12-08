@@ -13,6 +13,7 @@ namespace AcronymLookup.Core
         private readonly string _connectionString;
         private int _currentUserId;
         private int _currentProjectId; 
+        private readonly AuditService _auditService;
 
 
         #endregion
@@ -25,6 +26,9 @@ namespace AcronymLookup.Core
                 throw new ArgumentNullException("Connection string cannot be empty", nameof(connectionString)); 
 
             _connectionString = connectionString;
+
+            _auditService = auditService ?? throw new ArgumentNullException(nameof(auditService));
+
             Logger.Log("DatabaseHandler created"); 
 
         }
@@ -367,6 +371,220 @@ namespace AcronymLookup.Core
             {
                 Logger.Log($"Error adding abbreviation: {ex.Message}");
                 return false; 
+            }
+        }
+
+        /// <summary>
+        /// updates an existing abbreviation
+        /// </summary>
+        /// <param name="abbreviation"></param>
+        /// <param name="newDefinition"></param>
+        /// <param name="newCategory"></param>
+        /// <param name="newNotes"></param>
+        /// <param name="editedByUserId"></param>
+        /// <param name="changeReason"></param>
+        /// <returns></returns>
+        public bool UpdateAbbreviation(
+            string abbreviation,
+            string newDefinition,
+            string newCategory,
+            string newNotes,
+            int editedByUserId,
+            string changeReason = "")
+        {
+            try
+            {
+                // Get the current values and AbbreviationID
+                var current = FindAbbreviation(abbreviation);
+                if (current == null)
+                {
+                    Logger.Log($"Cannot update: '{abbreviation}' not found");
+                    return false;
+                }
+
+                int abbreviationId = GetAbbreviationId(abbreviation);
+                if (abbreviationId == 0)
+                {
+                    Logger.Log($"Cannot get AbbreviationID for '{abbreviation}'");
+                    return false;
+                }
+
+                // Build list of changes for audit log
+                var changes = new List<(string, string, string)>();
+                
+                if (current.Definition != newDefinition)
+                    changes.Add(("Definition", current.Definition, newDefinition));
+                
+                if (current.Category != newCategory)
+                    changes.Add(("Category", current.Category ?? "", newCategory ?? ""));
+                
+                if (current.Notes != newNotes)
+                    changes.Add(("Notes", current.Notes ?? "", newNotes ?? ""));
+
+                // If nothing changed, no need to update
+                if (changes.Count == 0)
+                {
+                    Logger.Log($"No changes detected for '{abbreviation}'");
+                    return true;
+                }
+
+                // Update the database
+                string query = @"
+                    UPDATE Abbreviations
+                    SET 
+                        Definition = @Definition,
+                        Category = @Category,
+                        Notes = @Notes,
+                        ModifiedBy = @ModifiedBy,
+                        ModifiedByUserID = @ModifiedByUserID,
+                        DateModified = GETDATE()
+                    WHERE UPPER(Abbreviation) = @Abbreviation
+                        AND IsActive = 1";
+
+                using (SqlConnection connection = new SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    using (SqlCommand command = new SqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@Abbreviation", abbreviation.Trim().ToUpper());
+                        command.Parameters.AddWithValue("@Definition", newDefinition.Trim());
+                        command.Parameters.AddWithValue("@Category", 
+                            string.IsNullOrWhiteSpace(newCategory) ? DBNull.Value : newCategory.Trim());
+                        command.Parameters.AddWithValue("@Notes", 
+                            string.IsNullOrWhiteSpace(newNotes) ? DBNull.Value : newNotes.Trim());
+                        command.Parameters.AddWithValue("@ModifiedBy", "User"); // Could get username
+                        command.Parameters.AddWithValue("@ModifiedByUserID", editedByUserId);
+
+                        int rowsAffected = command.ExecuteNonQuery();
+
+                        if (rowsAffected > 0)
+                        {
+                            // Log all changes to audit trail
+                            _auditService.LogMultipleChanges(
+                                abbreviationId,
+                                _currentProjectId,
+                                editedByUserId,
+                                string.IsNullOrWhiteSpace(changeReason) ? "Term updated" : changeReason,
+                                changes.ToArray());
+
+                            Logger.Log($"Updated abbreviation '{abbreviation}'");
+                            return true;
+                        }
+                    }
+                }
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error updating abbreviation: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// deletes an abbreviation
+        /// </summary>
+        /// <param name="abbreviation"></param>
+        /// <param name="deletedByUserId"></param>
+        /// <param name="deleteReason"></param>
+        /// <returns></returns>
+        public bool DeleteAbbreviation(
+            string abbreviation,
+            int deletedByUserId,
+            string deleteReason = "")
+        {
+            try
+            {
+                // Get AbbreviationID before deleting
+                int abbreviationId = GetAbbreviationId(abbreviation);
+                if (abbreviationId == 0)
+                {
+                    Logger.Log($"Cannot delete: '{abbreviation}' not found");
+                    return false;
+                }
+
+                // Soft delete (set IsActive = 0)
+                string query = @"
+                    UPDATE Abbreviations
+                    SET IsActive = 0,
+                        ModifiedByUserID = @ModifiedByUserID,
+                        DateModified = GETDATE()
+                    WHERE UPPER(Abbreviation) = @Abbreviation
+                        AND IsActive = 1";
+
+                using (SqlConnection connection = new SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    using (SqlCommand command = new SqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@Abbreviation", abbreviation.Trim().ToUpper());
+                        command.Parameters.AddWithValue("@ModifiedByUserID", deletedByUserId);
+
+                        int rowsAffected = command.ExecuteNonQuery();
+
+                        if (rowsAffected > 0)
+                        {
+                            // Log deletion to audit trail
+                            _auditService.LogTermDeleted(
+                                abbreviationId,
+                                _currentProjectId,
+                                abbreviation,
+                                deletedByUserId,
+                                deleteReason);
+
+                            Logger.Log($"Deleted abbreviation '{abbreviation}'");
+                            return true;
+                        }
+                    }
+                }
+
+                Logger.Log($"Failed to delete '{abbreviation}' - not found or already deleted");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error deleting abbreviation: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// gets abbreviation id for audit trail 
+        /// </summary>
+        /// <param name="abbreviation"></param>
+        /// <returns></returns>
+        private int GetAbbreviationId(string abbreviation)
+        {
+            try
+            {
+                string query = @"
+                    SELECT AbbreviationID 
+                    FROM Abbreviations 
+                    WHERE UPPER(Abbreviation) = @Abbreviation 
+                        AND IsActive = 1";
+
+                using (SqlConnection connection = new SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    using (SqlCommand command = new SqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@Abbreviation", abbreviation.Trim().ToUpper());
+
+                        object result = command.ExecuteScalar();
+                        if (result != null && result != DBNull.Value)
+                        {
+                            return (int)result;
+                        }
+                    }
+                }
+
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error getting AbbreviationID: {ex.Message}");
+                return 0;
             }
         }
 

@@ -40,6 +40,11 @@ namespace AcronymLookup
         private DatabaseHandler? _databaseHandler; 
         private DefinitionBubble? _currentBubble; 
 
+        private PermissionService? _permissionService;
+        private AuditService? _auditService;
+        private PersonalDatabaseService? _personalDatabaseService;
+        private SearchService? _searchService;
+
         #endregion
 
 
@@ -111,31 +116,45 @@ namespace AcronymLookup
 
 
         #region Service Initialization
+        
         private void InitializeServices()
         {
             Logger.Log("Initializing Services");
 
-            // 1. Initialize CSV Parser 
-            //_csvParser = new CsvParser();
-            //Logger.Log("Initialized CSV Parser"); 
-
-            //1. initialize database handler 
+            //get connection string from user secrets
             var configuration = new ConfigurationBuilder()
                 .AddUserSecrets<App>()
                 .Build();
             string connectionString = configuration.GetConnectionString("AzureDatabase")
-                ?? throw new InvalidOperationException("Connection string not found in user secrets"); 
-            _databaseHandler = new DatabaseHandler(connectionString);
-            Logger.Log("Initialized Database Handler"); 
+                ?? throw new InvalidOperationException("Connection string not found in user secrets");
 
+            //Initialize AuditService (needed by DatabaseHandler) 
+            _auditService = new AuditService(connectionString);
+            Logger.Log("Initialized AuditService");
 
-            // 2. Initialize Clipboard Handler
+            //Initialize DatabaseHandler (now requires AuditService) 
+            _databaseHandler = new DatabaseHandler(connectionString, _auditService);
+            Logger.Log("Initialized DatabaseHandler");
+
+            //Initialize PermissionService 
+            _permissionService = new PermissionService(connectionString);
+            Logger.Log("Initialized PermissionService");
+
+            //4. Initialize PersonalDatabaseService
+            _personalDatabaseService = new PersonalDatabaseService(connectionString);
+            Logger.Log("Initialized PersonalDatabaseService");
+
+            //5. Initialize SearchService (requires DatabaseHandler and PersonalDatabaseService)
+            _searchService = new SearchService(_databaseHandler, _personalDatabaseService);
+            Logger.Log("Initialized SearchService");
+
+            // 6. Initialize Clipboard Handler
             _clipboardHandler = new ClipboardHandler();
-            Logger.Log("Initialized Clipboard Handler"); 
+            Logger.Log("Initialized Clipboard Handler");
 
-            //3. Initialize Hotkey Manager
+            // 7. Initialize Hotkey Manager
             _hotkeyManager = new HotkeyManager();
-            Logger.Log("Initialized Hotkey manager"); 
+            Logger.Log("Initialized Hotkey manager");
         }
 
 
@@ -305,33 +324,47 @@ namespace AcronymLookup
         #region Abbreviation Lookup
 
         /// <summary>
-        /// Looks up an abbreviation in the CSV data
+        /// looks up abbreviation in database 
         /// </summary>
+        /// <param name="searchTerm"></param>
         private void LookupAbbreviation(string searchTerm)
         {
             try
             {
-                if (_databaseHandler != null)
+                if (_searchService != null && _databaseHandler != null)
                 {
                     Logger.Log($"Looking up: '{searchTerm}'");
 
-                    var result = _databaseHandler.FindAbbreviation(searchTerm);
+                    // Search ALL (personal + project)
+                    var searchResult = _searchService.Search(
+                        searchTerm, 
+                        SearchScope.All, 
+                        _databaseHandler.CurrentUserId, 
+                        _databaseHandler.CurrentProjectId);
 
-                    if (result != null)
+                    if (searchResult.HasResults)
                     {
-                        Logger.Log($"Found: {result.Abbreviation} = {result.Definition}");
-                        ShowLookupResult(result, null, searchTerm);
+                        // Convert search results to AbbreviationData list
+                        var definitions = SearchService.GetAllResultsAsList(searchResult);
+                        
+                        Logger.Log($"Found {definitions.Count} definition(s):");
+                        foreach (var def in definitions)
+                        {
+                            Logger.Log($"  - {def.Abbreviation}: {def.Definition}");
+                        }
+
+                        ShowLookupResult(definitions[0], null, searchTerm);
                     }
                     else
                     {
-                        Logger.Log($" Not found: '{searchTerm}'");
-                        ShowLookupResult(null, $"'{searchTerm}' not found in abbreviation database", searchTerm);
+                        Logger.Log($"Not found: '{searchTerm}'");
+                        ShowLookupResult(null, $"'{searchTerm}' not found in any database", searchTerm);
                     }
                 }
                 else
                 {
-                    Logger.Log("CSV parser not available");
-                    ShowLookupResult(null, "Abbreviation database not loaded", null);
+                    Logger.Log("SearchService or DatabaseHandler not available");
+                    ShowLookupResult(null, "Service not initialized", null);
                 }
             }
             catch (Exception ex)
@@ -490,33 +523,84 @@ namespace AcronymLookup
             {
                 Logger.Log($"Saving term to database: {e.Abbreviation}");
 
-                if (_databaseHandler != null)
+                if (_databaseHandler != null && _permissionService != null)
                 {
-                    bool success = _databaseHandler.AddAbbreviation(
-                        e.Abbreviation,
-                        e.Definition,
-                        e.Category,
-                        e.Notes,
-                        "User"
-                    );
+                    int userId = _databaseHandler.CurrentUserId;
+                    int projectId = _databaseHandler.CurrentProjectId;
 
-                    if (success)
+                    // CHECK PERMISSIONS USING PERMISSIONSERVICE 
+                    bool canAddDirectly = _permissionService.CanAddTermsDirectly(userId, projectId);
+
+                    if (canAddDirectly)
                     {
-                        Logger.Log($"Term '{e.Abbreviation}' saved to database successfully");
+                        //user has permission - add directly to project database
+                        bool success = _databaseHandler.AddAbbreviation(
+                            e.Abbreviation,
+                            e.Definition,
+                            e.Category,
+                            e.Notes,
+                            "User");
+
+                        if (success)
+                        {
+                            Logger.Log($"Term '{e.Abbreviation}' added to PROJECT database");
+                            MessageBox.Show(
+                                $"Term '{e.Abbreviation}' added successfully to project database!",
+                                "Success",
+                                MessageBoxButton.OK,
+                                MessageBoxImage.Information);
+                        }
+                        else
+                        {
+                            Logger.Log($"Failed to save term '{e.Abbreviation}' to project database");
+                            MessageBox.Show(
+                                $"Failed to save term. Term may already exist.",
+                                "Save Failed",
+                                MessageBoxButton.OK,
+                                MessageBoxImage.Warning);
+                        }
                     }
                     else
                     {
-                        Logger.Log($"Failed to save term '{e.Abbreviation}' to database");
-                        MessageBox.Show(
-                            $"Failed to save term. Term may already exist in database.",
-                            "Save Failed",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Warning);
+                        //user doesn't have permission - add to personal database instead 
+                        if (_personalDatabaseService != null)
+                        {
+                            bool success = _personalDatabaseService.AddPersonalAbbreviation(
+                                userId,
+                                e.Abbreviation,
+                                e.Definition,
+                                e.Category,
+                                e.Notes);
+
+                            if (success)
+                            {
+                                Logger.Log($"Term '{e.Abbreviation}' added to PERSONAL database (no project permissions)");
+                                MessageBox.Show(
+                                    $"Term '{e.Abbreviation}' added to your personal database.\n\n" +
+                                    $"You don't have permission to add terms directly to the project.\n" +
+                                    $"Would you like to request approval to add it to the project?",
+                                    "Added to Personal Database",
+                                    MessageBoxButton.YesNo,
+                                    MessageBoxImage.Question);
+                                
+                                // TODO: If user clicks Yes, create a TermRequest
+                                // Priority 2B (Request/Approval Workflow)
+                            }
+                            else
+                            {
+                                Logger.Log($"Failed to save term to personal database");
+                                MessageBox.Show(
+                                    $"Failed to save term to personal database.",
+                                    "Save Failed",
+                                    MessageBoxButton.OK,
+                                    MessageBoxImage.Warning);
+                            }
+                        }
                     }
                 }
                 else
                 {
-                    Logger.Log("Database Handler Not Available");
+                    Logger.Log("Database Handler or Permission Service not available");
                     MessageBox.Show(
                         "Database connection is not available",
                         "Error",
@@ -564,6 +648,10 @@ namespace AcronymLookup
 
                 // CSV parser doesn't need special cleanup
                 _databaseHandler = null;
+                _permissionService = null;
+                _auditService = null;
+                _personalDatabaseService = null;
+                _searchService = null;
                 Logger.Log("All services cleaned up");
             }
             catch (Exception ex)
