@@ -59,6 +59,13 @@ namespace AcronymLookup.Services
             return result; 
         }
 
+        /// <summary>
+        /// search personal and project databases 
+        /// </summary>
+        /// <param name="searchTerm"></param>
+        /// <param name="userId"></param>
+        /// <param name="projectId"></param>
+        /// <returns></returns>
         private SearchResult SearchAll(string searchTerm, int userId, int projectId)
         {
             var result = new SearchResult
@@ -86,7 +93,80 @@ namespace AcronymLookup.Services
 
                 Logger.Log($"Search ALL: Personal = {result.PersonalResults.Count}, Project = {result.ProjectResults.Count}"); 
             }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error in SearchAll: {ex.Message}");
+            }
+
+            return result;
         }
+
+        /// <summary>
+        /// only search personal database 
+        /// </summary>
+        /// <param name="searchTerm"></param>
+        /// <param name="userId"></param>
+        /// <returns></returns>
+         private SearchResult SearchPersonalOnly(string searchTerm, int userId)
+        {
+            var result = new SearchResult
+            {
+                SearchTerm = searchTerm,
+                Scope = SearchScope.Personal
+            };
+
+            try
+            {
+                var personalTerm = _personalDatabaseService.FindPersonalAbbreviation(searchTerm, userId);
+                if (personalTerm != null)
+                {
+                    result.PersonalResults.Add(CreateSearchResultItem(personalTerm, "Personal"));
+                }
+
+                Logger.Log($"Search PERSONAL: Found {result.PersonalResults.Count} results");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error in SearchPersonalOnly: {ex.Message}");
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// only searches project databases 
+        /// </summary>
+        /// <param name="searchTerm"></param>
+        /// <param name="projectId"></param>
+        /// <returns></returns>
+        private SearchResult SearchProjectOnly(string searchTerm, int projectId)
+        {
+            var result = new SearchResult
+            {
+                SearchTerm = searchTerm,
+                Scope = SearchScope.Project
+            };
+
+            try
+            {
+                var projectTerm = _databaseHandler.FindAbbreviation(searchTerm);
+                if (projectTerm != null)
+                {
+                    result.ProjectResults.Add(CreateSearchResultItem(projectTerm, "Project"));
+                }
+
+                Logger.Log($"Search PROJECT: Found {result.ProjectResults.Count} results");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error in SearchProjectOnly: {ex.Message}");
+            }
+
+            return result;
+        }
+
+
+
 
         #endregion
 
@@ -143,6 +223,8 @@ namespace AcronymLookup.Services
 
             return allResults; 
         }
+        #endregion
+
     }
 
     #region Search Data classes 
