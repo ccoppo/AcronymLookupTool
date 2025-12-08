@@ -1,8 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using Microsoft.Data.SqlClient;
-using AcronymLookup.Models;
+﻿using AcronymLookup.Models;
 using AcronymLookup.Utilities; 
+using Microsoft.Data.SqlClient;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
 namespace AcronymLookup.Core
 {
@@ -367,6 +368,35 @@ namespace AcronymLookup.Core
                 Logger.Log($"Error adding abbreviation: {ex.Message}");
                 return false; 
             }
+        }
+
+        #endregion
+
+   
+
+        #region Private Helper Methods 
+        private bool ValidateInput(string abbreviation, string definition)
+        {
+            // validate input
+            if (string.IsNullOrWhiteSpace(abbreviation))
+            {
+                Logger.Log("Cannot add abbreviation: abbreviation is empty");
+                return false;
+            }
+            if (string.IsNullOrWhiteSpace(definition))
+            {
+                Logger.Log("Cannot add abbreviation: definition is empty");
+                return false;
+            }
+
+            var existing = FindAbbreviation(abbreviation);
+            if (existing != null)
+            {
+                Logger.Log($"Abbreviation '{abbreviation}' already exists in database");
+                return false;
+            }
+
+            return true; 
         }
 
         #endregion
