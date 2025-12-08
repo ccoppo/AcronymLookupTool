@@ -1,5 +1,6 @@
 ﻿using AcronymLookup.Models;
-using AcronymLookup.Utilities; 
+using AcronymLookup.Utilities;
+using AcronymLookup.Services; 
 using Microsoft.Data.SqlClient;
 using System;
 using System.Collections.Generic;
@@ -20,7 +21,7 @@ namespace AcronymLookup.Core
 
         #region Constructor 
 
-        public DatabaseHandler(string connectionString)
+        public DatabaseHandler(string connectionString, AuditService auditService)
         {
             if (string.IsNullOrWhiteSpace(connectionString))
                 throw new ArgumentNullException("Connection string cannot be empty", nameof(connectionString)); 

@@ -197,7 +197,7 @@ namespace AcronymLookup.Services
         /// </summary>
         /// <param name="searchResult"></param>
         /// <returns></returns>
-        private static List <AbbreviationData> GetAllResultsAsList(SearchResult searchResult)
+        public static List <AbbreviationData> GetAllResultsAsList(SearchResult searchResult)
         {
             var allResults = new List<AbbreviationData>(); 
 
