@@ -521,7 +521,7 @@ namespace AcronymLookup
                     canAddToProject = _permissionService.CanAddTermsDirectly(userId, projectId);
                 }
 
-                var addTermWindow = new AddTermWindow(e.SearchTerm);
+                var addTermWindow = new AddTermWindow(e.SearchTerm, canAddToProject);
 
                 //subscribe to the term added event
                 addTermWindow.TermAdded += OnTermAdded;
@@ -531,7 +531,7 @@ namespace AcronymLookup
             }
             catch (Exception ex)
             {
-
+                Logger.Log($"Error opening Add Term Window: {ex.Message}"); 
             }
 
 
