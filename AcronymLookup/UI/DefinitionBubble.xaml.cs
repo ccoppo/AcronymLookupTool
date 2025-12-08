@@ -23,7 +23,7 @@ namespace AcronymLookup.UI
         public event EventHandler<EditTermEventArgs>? EditTermRequested; 
 
         public event EventHandler <DeleteTermEventArgs>? DeleteTermRequested;
-        public event EventHandler<PromoteTermEventArs>? PromoteTermRequested;  
+        public event EventHandler <PromoteTermEventArgs>? PromoteTermRequested;  
 
         #endregion
 

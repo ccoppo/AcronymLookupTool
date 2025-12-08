@@ -12,7 +12,8 @@ using System.Windows;
 using static AcronymLookup.Services.ClipboardHandler;
 using static AcronymLookup.UI.DefinitionBubble;
 using static AcronymLookup.UI.AddTermWindow; 
-using static AcronymLookup.UI.EditTermWindow; 
+using static AcronymLookup.UI.EditTermWindow;
+using static AcronymLookup.UI.PromoteTermWindow; 
 //using AcronymLookup.UI; 
 
 namespace AcronymLookup
@@ -920,7 +921,7 @@ namespace AcronymLookup
 
 
         /// <summary>
-        /// Handles promote term request - shows promotion dialog
+        /// Handles promote term request, shows promotion dialog
         /// </summary>
         private void OnPromoteTermRequested(object? sender, DefinitionBubble.PromoteTermEventArgs e)
         {
