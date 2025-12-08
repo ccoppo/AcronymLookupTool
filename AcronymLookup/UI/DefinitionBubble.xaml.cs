@@ -22,7 +22,8 @@ namespace AcronymLookup.UI
 
         public event EventHandler<EditTermEventArgs>? EditTermRequested; 
 
-        public event EventHandler <DeleteTermEventArgs>? DeleteTermRequested; 
+        public event EventHandler <DeleteTermEventArgs>? DeleteTermRequested;
+        public event EventHandler<PromoteTermEventArs>? PromoteTermRequested;  
 
         #endregion
 
@@ -121,12 +122,15 @@ namespace AcronymLookup.UI
                     SourceBadge.Background = new System.Windows.Media.SolidColorBrush( 
                         System.Windows.Media.Color.FromRgb(40, 167, 69)
                     );
+                    PromoteButton.Visibility = Visibility.Visible;
+                    PromoteButton.IsEnabled = true;
                 }
                 else if (definition.Source == "Project")
                 {
                     SourceBadge.Background = new System.Windows.Media.SolidColorBrush( 
                         System.Windows.Media.Color.FromRgb(0, 123, 255)
                     );
+                    PromoteButton.Visibility = Visibility.Collapsed;
                 }
             }
             else
@@ -392,6 +396,41 @@ namespace AcronymLookup.UI
             }
         }
 
+        private void PromoteButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (!_currentDefinitions.Any() || _currentDefinitionIndex >= _currentDefinitions.Count)
+                {
+                    Logger.Log("No term to promote");
+                    return;
+                }
+
+                var currentTerm = _currentDefinitions[_currentDefinitionIndex];
+                
+                //only allow promoting Personal terms
+                if (currentTerm.Source != "Personal")
+                {
+                    Logger.Log($"Cannot promote - term is not from Personal database (Source: {currentTerm.Source})");
+                    MessageBox.Show(
+                        "Only terms from your Personal database can be promoted to Projects.",
+                        "Cannot Promote",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                    return;
+                }
+
+                Logger.Log($"Promote button clicked for '{currentTerm.Abbreviation}'");
+
+                var args = new PromoteTermEventArgs(currentTerm);
+                PromoteTermRequested?.Invoke(this, args);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error handling promote button: {ex.Message}");
+            }
+        }
+
         protected override void OnClosed(EventArgs e)
         {
             BubbleClosed?.Invoke(this, EventArgs.Empty);
@@ -432,6 +471,16 @@ namespace AcronymLookup.UI
             public AbbreviationData Term { get; }
 
             public DeleteTermEventArgs(AbbreviationData term)
+            {
+                Term = term;
+            }
+        }
+
+        public class PromoteTermEventArgs : EventArgs
+        {
+            public AbbreviationData Term { get; }
+
+            public PromoteTermEventArgs(AbbreviationData term)
             {
                 Term = term;
             }

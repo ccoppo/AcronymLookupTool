@@ -423,6 +423,7 @@ namespace AcronymLookup
                 _currentBubble.AddTermRequested += OnAddTermRequested;
                 _currentBubble.EditTermRequested += OnEditTermRequested;
                 _currentBubble.DeleteTermRequested += OnDeleteTermRequested;
+                _currentBubble.PromoteTermRequested += OnPromoteTermRequested; 
 
                 //show the bubble with results
                 _currentBubble.ShowDefinition(searchTerm, definitions);
@@ -469,6 +470,7 @@ namespace AcronymLookup
                     _currentBubble.AddTermRequested -= OnAddTermRequested;
                     _currentBubble.EditTermRequested -= OnEditTermRequested;
                     _currentBubble.DeleteTermRequested -= OnDeleteTermRequested;
+                    _currentBubble.PromoteTermRequested -= OnPromoteTermRequested;
                     _currentBubble.CloseBubble();
                     _currentBubble = null; 
                 }
@@ -493,6 +495,7 @@ namespace AcronymLookup
                     _currentBubble.AddTermRequested -= OnAddTermRequested;
                     _currentBubble.EditTermRequested -= OnEditTermRequested; 
                     _currentBubble.DeleteTermRequested -= OnDeleteTermRequested; 
+                    _currentBubble.PromoteTermRequested -= OnPromoteTermRequested; 
 
                     _currentBubble = null; 
                 }
@@ -909,6 +912,175 @@ namespace AcronymLookup
                 Logger.Log($"Error handling delete request: {ex.Message}");
                 MessageBox.Show(
                     $"Error deleting term: {ex.Message}",
+                    "Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+
+        /// <summary>
+        /// Handles promote term request - shows promotion dialog
+        /// </summary>
+        private void OnPromoteTermRequested(object? sender, DefinitionBubble.PromoteTermEventArgs e)
+        {
+            try
+            {
+                Logger.Log($"Promote requested for '{e.Term.Abbreviation}'");
+
+                if (_databaseHandler == null || _permissionService == null)
+                {
+                    Logger.Log("Required services not available");
+                    MessageBox.Show(
+                        "Service not available",
+                        "Error",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                    return;
+                }
+
+                // Check if term is from Personal database
+                if (e.Term.Source != "Personal")
+                {
+                    Logger.Log($"Cannot promote - not a personal term (Source: {e.Term.Source})");
+                    MessageBox.Show(
+                        "Only terms from your Personal database can be promoted.",
+                        "Cannot Promote",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                int userId = _databaseHandler.CurrentUserId;
+                int projectId = _databaseHandler.CurrentProjectId;
+
+                // Check if user can add to project directly
+                bool canAddDirectly = _permissionService.CanAddTermsDirectly(userId, projectId);
+
+                // Show promotion window
+                var promoteWindow = new PromoteTermWindow(e.Term, canAddDirectly);
+                promoteWindow.TermPromoted += OnTermPromoted;
+
+                bool? result = promoteWindow.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error handling promote request: {ex.Message}");
+                MessageBox.Show(
+                    $"Error: {ex.Message}",
+                    "Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// Handles the actual promotion after user confirms
+        /// </summary>
+        private void OnTermPromoted(object? sender, PromoteTermWindow.TermPromotedEventArgs e)
+        {
+            try
+            {
+                Logger.Log($"Processing promotion for '{e.Abbreviation}'");
+
+                if (_databaseHandler == null || _personalDatabaseService == null || _permissionService == null)
+                {
+                    Logger.Log("Required services not available");
+                    return;
+                }
+
+                int userId = _databaseHandler.CurrentUserId;
+                int projectId = _databaseHandler.CurrentProjectId;
+
+                // Check permissions
+                bool canAddDirectly = _permissionService.CanAddTermsDirectly(userId, projectId);
+
+                if (canAddDirectly)
+                {
+                    // User has permission - add directly to project
+                    Logger.Log($"User has permission - promoting directly");
+
+                    // Get the full term from personal database
+                    var personalTerm = _personalDatabaseService.FindPersonalAbbreviation(e.Abbreviation, userId);
+                    
+                    if (personalTerm == null)
+                    {
+                        Logger.Log($"Personal term '{e.Abbreviation}' not found");
+                        MessageBox.Show(
+                            "Could not find term in personal database.",
+                            "Error",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Error);
+                        return;
+                    }
+
+                    // Add to project database
+                    bool success = _databaseHandler.AddAbbreviation(
+                        personalTerm.Abbreviation,
+                        personalTerm.Definition,
+                        personalTerm.Category,
+                        personalTerm.Notes,
+                        "Promoted from Personal");
+
+                    if (success)
+                    {
+                        Logger.Log($"Successfully promoted '{e.Abbreviation}' to project");
+                        MessageBox.Show(
+                            $"Term '{e.Abbreviation}' has been promoted to the project database!",
+                            "Promotion Successful",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        Logger.Log($"Failed to promote - term may already exist in project");
+                        MessageBox.Show(
+                            "Failed to promote term. It may already exist in the project database.",
+                            "Promotion Failed",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning);
+                    }
+                }
+                else
+                {
+                    // User needs approval - create term request
+                    Logger.Log($"User needs approval - creating term request");
+
+                    bool success = _personalDatabaseService.RequestPromotionToProject(
+                        userId,
+                        projectId,
+                        e.Abbreviation,
+                        e.Reason);
+
+                    if (success)
+                    {
+                        Logger.Log($"Successfully created promotion request for '{e.Abbreviation}'");
+                        MessageBox.Show(
+                            $"Promotion request created for '{e.Abbreviation}'!\n\n" +
+                            "A project manager will review your request.",
+                            "Request Submitted",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        Logger.Log($"Failed to create promotion request");
+                        MessageBox.Show(
+                            "Failed to create promotion request.",
+                            "Request Failed",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning);
+                    }
+                }
+
+                // Refresh the bubble to show updated term
+                CloseBubbleIfOpen();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error processing promotion: {ex.Message}");
+                MessageBox.Show(
+                    $"Error promoting term: {ex.Message}",
                     "Error",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);

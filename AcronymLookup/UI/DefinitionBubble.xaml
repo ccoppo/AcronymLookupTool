@@ -191,9 +191,11 @@
 					<ColumnDefinition Width="Auto"/>
 					<ColumnDefinition Width="*"/>
 					<ColumnDefinition Width="Auto"/>
+					<ColumnDefinition Width="*"/>
+					<ColumnDefinition Width="Auto"/>
 				</Grid.ColumnDefinitions>
 
-				<!-- *** PREVIOUS BUTTON *** -->
+				<!-- PREVIOUS BUTTON -->
 				<Button Grid.Column="0"
 						Name="PreviousButton"
 						Content="&lt;"
@@ -223,7 +225,7 @@
 					</Button.Style>
 				</Button>
 
-				<!-- *** EDIT BUTTON (NEW) *** -->
+				<!-- EDIT BUTTON -->
 				<Button Grid.Column="2"
 						Name="EditButton"
 						Content="✎"
@@ -253,7 +255,7 @@
 					</Button.Style>
 				</Button>
 
-				<!-- *** DELETE BUTTON (NEW) *** -->
+				<!-- DELETE BUTTON -->
 				<Button Grid.Column="4"
 						Name="DeleteButton"
 						Content="🗑"
@@ -283,8 +285,39 @@
 					</Button.Style>
 				</Button>
 
-				<!-- *** ADD BUTTON *** -->
+				<!-- PROMOTE BUTTON  -->
 				<Button Grid.Column="6"
+						Name="PromoteButton"
+						Content="↑"
+						Width="32"
+						Height="28"
+						Margin="4,6,4,6"
+						Background="#FFC107"
+						Foreground="White"
+						BorderThickness="0"
+						FontSize="16"
+						FontWeight="Bold"
+						Cursor="Hand"
+						Click="PromoteButton_Click"
+						ToolTip="Promote to Project"
+						Visibility="Collapsed">
+					<Button.Style>
+						<Style TargetType="Button">
+							<Style.Triggers>
+								<Trigger Property="IsMouseOver" Value="True">
+									<Setter Property="Background" Value="#E0A800"/>
+								</Trigger>
+								<Trigger Property="IsEnabled" Value="False">
+									<Setter Property="Background" Value="#ADB5BD"/>
+									<Setter Property="Cursor" Value="Arrow"/>
+								</Trigger>
+							</Style.Triggers>
+						</Style>
+					</Button.Style>
+				</Button>
+
+				<!-- ADD BUTTON -->
+				<Button Grid.Column="8"
 						Name="AddButton"
 						Content="+"
 						Width="32"
@@ -309,8 +342,8 @@
 					</Button.Style>
 				</Button>
 
-				<!-- *** NEXT BUTTON *** -->
-				<Button Grid.Column="8"
+				<!-- NEXT BUTTON  -->
+				<Button Grid.Column="10"
 						Name="NextButton"
 						Content="&gt;"
 						Width="32"
