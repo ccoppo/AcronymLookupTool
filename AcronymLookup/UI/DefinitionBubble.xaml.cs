@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Controls; 
 using AcronymLookup.Models;
 using AcronymLookup.Utilities; 
 
@@ -437,7 +438,7 @@ namespace AcronymLookup.UI
             }
         }
 
-        private void SourceBadge_Click(object sender, RoutedEventArgs e)
+        private void SourceBadge_Click(object sender, MouseButtonEventArgs e)
         {
             try
             {
