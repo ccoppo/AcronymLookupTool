@@ -46,6 +46,11 @@ namespace AcronymLookup
         private AuditService? _auditService;
         private PersonalDatabaseService? _personalDatabaseService;
         private SearchService? _searchService;
+        private List<UserProjectInfo> _userProjects = new List<UserProjectInfo>();
+        private UserProjectInfo? _currentProject = null;
+
+
+
 
         #endregion
 
@@ -80,7 +85,6 @@ namespace AcronymLookup
 
                 Logger.Log("Application startup complete!");
                 Logger.Log("Workflow: Select text -> Ctrl+C -> Ctrl+Alt+L");
-
 
             }
             catch (Exception ex)
@@ -216,17 +220,29 @@ namespace AcronymLookup
 
                     if (userId.HasValue)
                     {
+                        _currentProject = _userProjects[0];
                         Logger.Log($"Found user in database: UserID = {userId.Value}");
 
-                        int? projectId = _databaseHandler.GetUserFirstProject(userId.Value);
+                        _userProjects = _databaseHandler.GetUserProjects(userId.Value);
 
-                        if (projectId.HasValue)
+                        if (_userProjects.Count > 0)
                         {
-                            _databaseHandler.SetUserContext(userId.Value, projectId.Value);
+                            _currentProject = _userProjects[0];
+                    
+                            _databaseHandler.SetUserContext(userId.Value, _currentProject.ProjectID);
 
                             int count = _databaseHandler.Count;
                             Logger.Log("Successfully connected to database");
-                            Logger.Log($"User Context set: UserID={userId.Value}, ProjectID={projectId.Value}");
+                            Logger.Log($"User has access to {_userProjects.Count} project(s):");
+                            
+                            //Log all available projects
+                            foreach (var project in _userProjects)
+                            {
+                                string marker = (project.ProjectID == _currentProject.ProjectID) ? "→ " : "  ";
+                                Logger.Log($"{marker}{project.DisplayName} (Role: {project.UserRole})");
+                            }
+                            
+                            Logger.Log($"Current project: {_currentProject.DisplayName}");
                             Logger.Log($"Database has {count} total abbreviations");
                         }
                         else
@@ -424,10 +440,13 @@ namespace AcronymLookup
                 _currentBubble.AddTermRequested += OnAddTermRequested;
                 _currentBubble.EditTermRequested += OnEditTermRequested;
                 _currentBubble.DeleteTermRequested += OnDeleteTermRequested;
-                _currentBubble.PromoteTermRequested += OnPromoteTermRequested; 
+                _currentBubble.PromoteTermRequested += OnPromoteTermRequested;
+                _currentBubble.ProjectSwitchRequested += OnProjectSwitchRequested;
 
-                //show the bubble with results
-                _currentBubble.ShowDefinition(searchTerm, definitions);
+                string currentProjectName = _currentProject?.ProjectCode ?? "Unknown Project"; 
+                List <UserProjectInfo> availableProjects = GetAvailableProjects(); 
+
+                _currentBubble.ShowDefinition(searchTerm, definitions, currentProjectName, availableProjects); 
 
                 Console.WriteLine("Definition bubble displayed"); 
             }catch (Exception ex)
@@ -472,6 +491,7 @@ namespace AcronymLookup
                     _currentBubble.EditTermRequested -= OnEditTermRequested;
                     _currentBubble.DeleteTermRequested -= OnDeleteTermRequested;
                     _currentBubble.PromoteTermRequested -= OnPromoteTermRequested;
+                    _currentBubble.ProjectSwitchRequested -= OnPromoteTermRequested; 
                     _currentBubble.CloseBubble();
                     _currentBubble = null; 
                 }
@@ -482,6 +502,78 @@ namespace AcronymLookup
         }
 
         #endregion
+
+        #region Project Management 
+
+        /// <summary>
+        /// Switches the user's active project context and updates database handler 
+        /// </summary>
+        /// <param name="newProject"></param>
+        public void SwitchProject(UserProjectInfo newProject)
+        {
+            try
+            {
+                if (newProject == null)
+                {
+                    Logger.Log("Cannot switch to null project");
+                    return;
+                }
+
+                if (_currentProject != null && newProject.ProjectID == _currentProject.ProjectID)
+                {
+                    Logger.Log($"Already on project: {newProject.DisplayName}");
+                    return;
+                }
+
+                Logger.Log($"Switching from '{_currentProject?.DisplayName ?? "None"}' to '{newProject.DisplayName}'");
+
+                //switch project
+                _currentProject = newProject;
+
+                //update database context
+                if (_databaseHandler != null)
+                {
+                    _databaseHandler.SetUserContext(
+                        _databaseHandler.CurrentUserId,
+                        newProject.ProjectID);
+                }
+
+                //close any bubble if oppen 
+                CloseBubbleIfOpen();
+
+                Logger.Log($"Successfully switched to project: {newProject.DisplayName}");
+                Logger.Log($"Role: {newProject.UserRole}"); 
+                        
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error switching projects: {ex.Message}");
+                MessageBox.Show(
+                    $"Failed to switch projects: {ex.Message}",
+                    "Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        ///gets the list of all projects the user has access to
+        /// </summary>
+        public List<UserProjectInfo> GetAvailableProjects()
+        {
+            return new List<UserProjectInfo>(_userProjects);
+        }
+
+        /// <summary>
+        ///gets the currently active project
+        /// </summary>
+        public UserProjectInfo? GetCurrentProject()
+        {
+            return _currentProject;
+        }
+
+        #endregion
+
 
         #region Event Handlers 
         private void OnBubbleClosed(object sender, EventArgs e)
@@ -497,6 +589,7 @@ namespace AcronymLookup
                     _currentBubble.EditTermRequested -= OnEditTermRequested; 
                     _currentBubble.DeleteTermRequested -= OnDeleteTermRequested; 
                     _currentBubble.PromoteTermRequested -= OnPromoteTermRequested; 
+                    _currentBubble.ProjectSwitchRequested -= OnProjectSwitchRequested;
 
                     _currentBubble = null; 
                 }
@@ -1088,7 +1181,36 @@ namespace AcronymLookup
             }
         }
 
+        /// <summary>
+        /// Handles project switch request from the definition
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void OnProjectSwitchRequested(object? sender, DefinitionBubble.ProjectSwitchRequestedEventArgs e)
+        {
+            try
+            {
+                Logger.Log($"Project switch requested: {e.SelectedProject.DisplayName}");
 
+                if (e.SelectedProject == null)
+                {
+                    Logger.Log("Cannot switch to null project");
+                    return;
+                }
+
+                // Switch the project
+                SwitchProject(e.SelectedProject);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error handling project switch request: {ex.Message}");
+                MessageBox.Show(
+                    $"Error switching projects: {ex.Message}",
+                    "Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
 
         #endregion
 

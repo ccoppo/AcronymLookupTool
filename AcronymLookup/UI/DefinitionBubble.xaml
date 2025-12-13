@@ -93,18 +93,79 @@
 								   Margin="0,0,8,0"/>
 
                         <!-- source badge -->
-                        <Border Name="SourceBadge"
-								Background="#007BFF"
-								CornerRadius="4"
-								Padding="6,2"
-								VerticalAlignment="Center"
-								Visibility="Collapsed">
-                            <TextBlock Name="SourceText"
-									   Text="Project"
-									   FontSize="10"
-									   FontWeight="SemiBold"
-									   Foreground="White"/>
+                        <Button Name="SourceBadge"
+							Background="#007BFF"
+							BorderThickness="0"
+							Padding="6,2"
+							VerticalAlignment="Center"
+							Visibility="Collapsed"
+							Cursor="Hand"
+							Click="SourceBadge_Click">
+						<Button.Style>
+							<Style TargetType="Button">
+								<Style.Triggers>
+									<Trigger Property="IsMouseOver" Value="True">
+										<Setter Property="Opacity" Value="0.8"/>
+									</Trigger>
+								</Style.Triggers>
+							</Style>
+						</Button.Style>
+						<Button.Template>
+							<ControlTemplate TargetType="Button">
+								<Border Background="{TemplateBinding Background}"
+										CornerRadius="4"
+										Padding="{TemplateBinding Padding}">
+									<TextBlock Name="SourceText"
+											Text="Project"
+											FontSize="10"
+											FontWeight="SemiBold"
+											Foreground="White"/>
+								</Border>
+							</ControlTemplate>
+						</Button.Template>
+					</Button>
+					<!-- project selector popup-->
+					<Popup Name="ProjectSelectorPopup"
+                           PlacementTarget="{Binding ElementName=SourceBadge}"
+                           Placement="Bottom"
+                           StaysOpen="False"
+                           AllowsTransparency="True">
+                        <Border Background="#FFFFFF"
+                                BorderBrush="#CED4DA"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Padding="8"
+                                MinWidth="200">
+                            <StackPanel>
+                                <TextBlock Text="Switch Project:"
+                                           FontSize="11"
+                                           FontWeight="SemiBold"
+                                           Foreground="#495057"
+                                           Margin="0,0,0,6"/>
+                                
+                                <ListBox Name="ProjectListBox"
+                                         BorderThickness="0"
+                                         MaxHeight="200"
+                                         SelectionChanged="ProjectListBox_SelectionChanged">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Margin="4">
+                                                <TextBlock Text="{Binding ProjectCode}"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="#007BFF"/>
+                                                <TextBlock Text="{Binding ProjectName}"
+                                                           FontSize="10"
+                                                           Foreground="#6C757D"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </StackPanel>
                         </Border>
+                    </Popup>
+
+
                     </StackPanel>
 
                     <!--def display-->

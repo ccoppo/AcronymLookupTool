@@ -589,6 +589,66 @@ namespace AcronymLookup.Core
             }
         }
 
+        /// <summary>
+        /// Gets all projects that a user has access to
+        /// Returns list of project info including ID, name, and code
+        /// </summary>
+        public List<UserProjectInfo> GetUserProjects(int userId)
+        {
+            var projects = new List<UserProjectInfo>();
+            
+            try
+            {
+                string query = @"
+                    SELECT 
+                        p.ProjectID,
+                        p.ProjectName,
+                        p.ProjectCode,
+                        p.Description,
+                        pm.Role
+                    FROM ProjectMembers pm
+                    INNER JOIN Projects p ON pm.ProjectID = p.ProjectID
+                    WHERE pm.UserID = @UserID
+                        AND pm.IsActive = 1
+                        AND p.IsActive = 1
+                        AND pm.CanViewTerms = 1
+                    ORDER BY pm.DateAdded ASC";
+
+                using (SqlConnection connection = new SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    
+                    using (SqlCommand command = new SqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@UserID", userId);
+                        
+                        using (SqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                projects.Add(new UserProjectInfo
+                                {
+                                    ProjectID = reader.GetInt32(0),
+                                    ProjectName = reader.GetString(1),
+                                    ProjectCode = reader.GetString(2),
+                                    Description = reader.IsDBNull(3) ? "" : reader.GetString(3),
+                                    UserRole = reader.IsDBNull(4) ? "Viewer" : reader.GetString(4)
+                                });
+                            }
+                        }
+                    }
+                }
+                
+                Logger.Log($"Found {projects.Count} projects for user {userId}");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error getting user projects: {ex.Message}");
+            }
+            
+            return projects;
+        }
+
         #endregion
 
    
