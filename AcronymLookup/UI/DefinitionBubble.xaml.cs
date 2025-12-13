@@ -45,7 +45,7 @@ namespace AcronymLookup.UI
 
         #region Public Methods 
 
-        public void ShowDefinition(string searchTerm, List<AbbreviationData> definitions)
+        public void ShowDefinition(string searchTerm, List<AbbreviationData> definitions, string currentProjectName, List<UserProjectInfo> availableProjects)
         {
             try
             {

@@ -491,7 +491,7 @@ namespace AcronymLookup
                     _currentBubble.EditTermRequested -= OnEditTermRequested;
                     _currentBubble.DeleteTermRequested -= OnDeleteTermRequested;
                     _currentBubble.PromoteTermRequested -= OnPromoteTermRequested;
-                    _currentBubble.ProjectSwitchRequested -= OnPromoteTermRequested; 
+                    _currentBubble.ProjectSwitchRequested -= OnProjectSwitchRequested; 
                     _currentBubble.CloseBubble();
                     _currentBubble = null; 
                 }
