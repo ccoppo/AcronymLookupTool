@@ -38,7 +38,7 @@ namespace AcronymLookup.Services
                 {
                     connection.Open(); 
 
-                    using(SqlCommand command = new SqlCommand(_connectionString))
+                    using(SqlCommand command = new SqlCommand(query, connection))
                     {
                         command.Parameters.AddWithValue("@UserID", userID);
                         object result = command.ExecuteScalar(); 
