@@ -220,7 +220,6 @@ namespace AcronymLookup
 
                     if (userId.HasValue)
                     {
-                        _currentProject = _userProjects[0];
                         Logger.Log($"Found user in database: UserID = {userId.Value}");
 
                         _userProjects = _databaseHandler.GetUserProjects(userId.Value);
