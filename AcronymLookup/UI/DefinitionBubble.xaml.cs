@@ -93,6 +93,41 @@ namespace AcronymLookup.UI
             }
         }
 
+        /// <summary>
+        /// updates the view filter and redisplays
+        /// </summary>
+        /// <param name="newFilter"></param>
+        public void UpdateViewFilter(ViewFilterMode newFilter)
+        {
+            try
+            {
+                Logger.Log($"Updating view filter to: {newFilter.DisplayName}"); 
+
+                _currentViewFilter = newFilter; 
+                _currentDefinitions = ApplyViewFilter(_allAvailableDefinitions, _currentViewFilter); 
+                _currentDefinitionIndex = 0;
+
+                if (_currentDefinitions.Any())
+                {
+                    DisplayCurrentDefinition(); 
+                    UpdateNavigationButtons(); 
+
+                    AbbreviationText.Visibility = Visibility.Visible; 
+                    DefinitionText.Visibility = Visibility.Visible; 
+
+                    Logger.Log($"Displaying {_currentDefinitions.Count} definitions with new filter"); 
+                }else
+                {
+                    ShowNotFoundMessage(); 
+                    Logger.Log("No definitions match new filter"); 
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error updating view filter: {ex.Message}"); 
+            }
+        }
+
         public void CloseBubble()
         {
             try
@@ -310,9 +345,15 @@ namespace AcronymLookup.UI
                         .FirstOrDefault(p => p.ProjectID == filter.ProjectID)?.ProjectCode;
                     
                     if (projectCode == null)
-                        return new List<AbbreviationData>();
-                        
-                    return allDefinitions.Where(d => d.Source == projectCode).ToList();
+                    {
+                        Logger.Log($"Could not find project code for ProjectID {filter.ProjectID}"); 
+                        return new List<AbbreviationData>(); 
+                    }
+                    Logger.Log($"Filtering for project code: {projectCode}");
+                    var filtered = allDefinitions.Where(d => d.Source == projectCode).ToList();
+                    Logger.Log($"Found {filtered.Count} terms matching project {projectCode}");
+                    
+                    return filtered;
 
                 default:
                     return new List<AbbreviationData>(allDefinitions);

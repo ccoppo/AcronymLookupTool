@@ -1150,6 +1150,16 @@ namespace AcronymLookup
 
                 int userId = _databaseHandler.CurrentUserId;
 
+                if (_currentBubble != null)
+                {
+                    string currentProjectName = _currentProject?.ProjectCode ?? "Unknown Project"; 
+                    List<UserProjectInfo> availableProjects = GetAvailableProjects(); 
+
+                    _currentBubble.UpdateViewFilter(e.NewFilter); 
+                    Logger.Log($"Bubble filter updated to {e.NewFilter.DisplayName}"); 
+                }
+
+                /*
                 // Perform search based on filter type
                 List<AbbreviationData> filteredResults;
 
@@ -1208,6 +1218,7 @@ namespace AcronymLookup
 
                     Logger.Log($"Bubble updated with {filteredResults.Count} filtered results");
                 }
+                */
             }
             catch (Exception ex)
             {
