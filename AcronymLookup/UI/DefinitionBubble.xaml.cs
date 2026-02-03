@@ -109,6 +109,8 @@ namespace AcronymLookup.UI
 
                 if (_currentDefinitions.Any())
                 {
+                    NotFoundContainer.Visibility = Visibility.Collapsed;
+                    
                     DisplayCurrentDefinition(); 
                     UpdateNavigationButtons(); 
 
