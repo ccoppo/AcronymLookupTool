@@ -27,7 +27,6 @@ namespace AcronymLookup.UI
 
         public event EventHandler <DeleteTermEventArgs>? DeleteTermRequested;
         public event EventHandler <PromoteTermEventArgs>? PromoteTermRequested;  
-        public event EventHandler<ProjectSwitchRequestedEventArgs>? ProjectSwitchRequested;
 
         #endregion
 
@@ -438,55 +437,6 @@ namespace AcronymLookup.UI
             }
         }
 
-        private void SourceBadge_Click(object sender, MouseButtonEventArgs e)
-        {
-            try
-            {
-                // Only show project selector if there are multiple projects AND this is a project term
-                if (_availableProjects.Count > 1)
-                {
-                    Logger.Log("Opening project selector");
-                    
-                    // Populate the project list
-                    ProjectListBox.ItemsSource = _availableProjects;
-                    
-                    // Show the popup
-                    ProjectSelectorPopup.IsOpen = true;
-                }
-                else
-                {
-                    Logger.Log("Only one project available, no need to switch");
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Error opening project selector: {ex.Message}");
-            }
-        }
-
-        private void ProjectListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            try
-            {
-                if (ProjectListBox.SelectedItem is UserProjectInfo selectedProject)
-                {
-                    Logger.Log($"User selected project: {selectedProject.DisplayName}");
-                    
-                    // Close the popup
-                    ProjectSelectorPopup.IsOpen = false;
-                    
-                    // Raise event to switch project
-                    var args = new ProjectSwitchRequestedEventArgs(selectedProject);
-                    ProjectSwitchRequested?.Invoke(this, args);
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Error handling project selection: {ex.Message}");
-            }
-        }
-
-
 
         protected override void OnClosed(EventArgs e)
         {
@@ -543,15 +493,8 @@ namespace AcronymLookup.UI
             }
         }
 
-        public class ProjectSwitchRequestedEventArgs : EventArgs
-        {
-            public UserProjectInfo SelectedProject { get; }
+        
 
-            public ProjectSwitchRequestedEventArgs(UserProjectInfo selectedProject)
-            {
-                SelectedProject = selectedProject;
-            }
-        }
         #endregion
     }
 }
