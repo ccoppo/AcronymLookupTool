@@ -131,6 +131,27 @@
                            Visibility="Collapsed"/>
             </StackPanel>
 
+            <StackPanel Name="ProjectSelectorPanel" 
+                        Grid.Row="5" 
+                        Margin="0,0,0,15"
+                        Visibility="Collapsed">
+                <TextBlock Text="Select Project:"
+                        FontSize="14"
+                        FontWeight="SemiBold"
+                        Foreground="#495057"
+                        Margin="0,0,0,5"/>
+                <ComboBox Name="ProjectSelector"
+                        Height="32"
+                        FontSize="14"
+                        DisplayMemberPath="DisplayName"/>
+                <TextBlock Name="ProjectHelpText"
+                        Text="Choose which project to add this term to"
+                        FontSize="11"
+                        Foreground="#6C757D"
+                        TextWrapping="Wrap"
+                        Margin="0,4,0,0"/>
+            </StackPanel>
+
             <!-- Buttons -->
             <Grid Grid.Row="6" Margin="0,10,0,0">
                 <Grid.ColumnDefinitions>

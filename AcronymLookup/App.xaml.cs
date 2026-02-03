@@ -563,7 +563,7 @@ namespace AcronymLookup
                     canAddToProject = _permissionService.CanAddTermsDirectly(userId, projectId);
                 }
 
-                var addTermWindow = new AddTermWindow(e.SearchTerm, canAddToProject);
+                var addTermWindow = new AddTermWindow(e.SearchTerm, canAddToProject, _userProjects, _currentProject);
 
                 //subscribe to the term added event
                 addTermWindow.TermAdded += OnTermAdded;
@@ -588,7 +588,7 @@ namespace AcronymLookup
                 if (_databaseHandler != null && _permissionService != null && _personalDatabaseService != null)
                 {
                     int userId = _databaseHandler.CurrentUserId;
-                    int projectId = _databaseHandler.CurrentProjectId;
+                    //int projectId = _databaseHandler.CurrentProjectId;
 
                     if (e.TargetDatabase == "Personal")
                     {
@@ -621,11 +621,27 @@ namespace AcronymLookup
                     }
                     else if (e.TargetDatabase == "Project")
                     {
+
+                        if (!e.TargetProjectId.HasValue)
+                        {
+                            Logger.Log("No project selected for adding term");
+                            MessageBox.Show(
+                                "Please select a project to add the term to.",
+                                "No Project Selected",
+                                MessageBoxButton.OK,
+                                MessageBoxImage.Warning);
+                            return;
+                        }
+
+                        int selectedProjectId = e.TargetProjectId.Value; 
+
                         //user chose Project database - check permissions first
-                        bool canAddDirectly = _permissionService.CanAddTermsDirectly(userId, projectId);
+                        bool canAddDirectly = _permissionService.CanAddTermsDirectly(userId, selectedProjectId);
 
                         if (canAddDirectly)
                         {
+                            int originalProjectId = _databaseHandler.CurrentProjectId; 
+                            _databaseHandler.SetUserContext(userId, selectedProjectId); 
                             // User has permission - add directly to project
                             bool success = _databaseHandler.AddAbbreviation(
                                 e.Abbreviation,
@@ -634,9 +650,14 @@ namespace AcronymLookup
                                 e.Notes,
                                 "User");
 
+                            _databaseHandler.SetUserContext(userId, originalProjectId); 
+
                             if (success)
                             {
-                                Logger.Log($"Term '{e.Abbreviation}' added to PROJECT database");
+                                var selectedProject = _userProjects.FirstOrDefault(p => p.ProjectID == selectedProjectId);
+                                string projectName = selectedProject?.DisplayName ?? $"Project {selectedProjectId}";
+
+                                Logger.Log($"Term '{e.Abbreviation}' added to PROJECT database: {projectName}");
                                 MessageBox.Show(
                                     $"Term '{e.Abbreviation}' added successfully to project database!",
                                     "Success",

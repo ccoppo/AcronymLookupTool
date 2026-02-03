@@ -109,11 +109,14 @@ namespace AcronymLookup.UI
 
                 if (_currentDefinitions.Any())
                 {
+                    NotFoundContainer.Visibility = Visibility.Collapsed;
+                    
                     DisplayCurrentDefinition(); 
                     UpdateNavigationButtons(); 
 
                     AbbreviationText.Visibility = Visibility.Visible; 
                     DefinitionText.Visibility = Visibility.Visible; 
+
 
                     Logger.Log($"Displaying {_currentDefinitions.Count} definitions with new filter"); 
                 }else

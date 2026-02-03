@@ -32,28 +32,33 @@ namespace AcronymLookup.UI
 
         private string? _initialSearchTerm;
         private bool _canAddToProject; 
+        private List<UserProjectInfo> _availableProjects = new List<UserProjectInfo>(); 
+        private UserProjectInfo? _currentDefaultProject = null; 
 
         #endregion
 
         #region Constructor 
 
-        public AddTermWindow(string? searchTerm = null, bool canAddToProject = false)
+        public AddTermWindow(string? searchTerm = null, bool canAddToProject = false, List<UserProjectInfo>? availableProjects = null, UserProjectInfo? currentProject = null)
         {
             InitializeComponent();
 
             _initialSearchTerm = searchTerm;
             _canAddToProject = canAddToProject;
+            _availableProjects = availableProjects ?? new List<UserProjectInfo>(); 
+            _currentDefaultProject = currentProject; 
 
             //if a search term provided, pre-fill the abbreviation field 
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
                 AbbreviationInput.Text = searchTerm;
-
                 //move focus to abbreviation input 
                 AbbreviationInput.Focus();
-
-                ConfigureDatabaseSelection();
             }
+
+            ConfigureDatabaseSelection();
+            ConfigureProjectSelection(); 
+
             Logger.Log("Add Term window opened"); 
         }
 
@@ -88,6 +93,30 @@ namespace AcronymLookup.UI
             }
         }
 
+        private void ConfigureProjectSelection()
+        {
+            if(_availableProjects.Count > 0)
+            {
+                ProjectSelector.ItemsSource = _availableProjects;
+
+                if(_currentDefaultProject != null)
+                {
+                    ProjectSelector.SelectedItem = _currentDefaultProject;
+                }
+                else
+                {
+                    ProjectSelector.SelectedIndex = 0; 
+                }
+
+                Logger.Log($"Configured project selector with {_availableProjects.Count} projects");
+
+            }
+            else
+            {
+                Logger.Log("No projects available for selection"); 
+            }
+        }
+
         #endregion
 
         #region EventHandlers 
@@ -113,7 +142,7 @@ namespace AcronymLookup.UI
                 Logger.Log($"Attempting to save term to {selectedDatabase} database");
 
 
-                var args = new TermAddedEventArgs(abbreviation, definition, category, notes, selectedDatabase);
+                var args = new TermAddedEventArgs(abbreviation, definition, category, notes, selectedDatabase, selectedProjectId);
                 TermAdded?.Invoke(this, args);
 
                 Logger.Log("Term saved successfully!");
@@ -125,6 +154,29 @@ namespace AcronymLookup.UI
             {
                 Logger.Log($"Error saving term: {ex.Message}");
                 ShowValidationMessage($"Error saving term: {ex.Message}");
+            }
+        }
+
+        private void DatabaseSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            try
+            {
+                var selectedItem = (ComboBoxItem)DatabaseSelector_SelectionChanged.SelectedItem; 
+                string selectedDatabase = selectedItem?.Tag?.ToString() ?? "Personal"; 
+
+                if (selectedDatabase == "Project" && _canAddToProject)
+                {
+                    ProjectSelectorPanel.Visibility = Visibility.Visible;
+                    Logger.Log("Project selector shown");
+                }
+                else
+                {
+                    ProjectSelectorPanel.Visibility = Visibility.Collapsed;
+                    Logger.Log("Project selector hidden");
+                }
+            }catch (Exception ex)
+            {
+                Logger.Log($"Error in DatabaseSelector_SelectionChanged: {ex.Message}"); 
             }
         }
 
@@ -185,14 +237,16 @@ namespace AcronymLookup.UI
             public string Category { get; } 
             public string Notes { get; } 
             public string TargetDatabase { get; }
+            public int? TargetProjectId { get; }
 
-            public TermAddedEventArgs(string abbreviation, string definition, string category, string notes, string targetDatabase)
+            public TermAddedEventArgs(string abbreviation, string definition, string category, string notes, string targetDatabase, int? targetProjectId = null)
             {
                 Abbreviation = abbreviation;
                 Definition = definition;
                 Category = category;
                 Notes = notes;
                 TargetDatabase = targetDatabase;
+                TargetProjectId = targetProjectId; 
             }
         }
 
