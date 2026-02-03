@@ -126,9 +126,18 @@ namespace AcronymLookup.UI
 
             if(_currentViewFilter.Type == FilterType.All)
             {
-                SourceText.Text = "ALL"; 
-                SourceBadge.Background = new System.Windows.Media.SolidColorBrush(
-                    System.Windows.Media.Color.FromRgb(0,123,255)); 
+                SourceText.Text = string.IsNullOrWhiteSpace(definition.Source) ? "ALL" : definition.Source; 
+
+                if (definition.Source == "Personal")
+                {
+                    SourceBadge.Background = new System.Windows.Media.SolidColorBrush(
+                        System.Windows.Media.Color.FromRgb(40, 167, 69)); //yellow
+                }
+                else
+                {
+                    SourceBadge.Background = new System.Windows.Media.SolidColorBrush(
+                        System.Windows.Media.Color.FromRgb(255, 193, 7)); //yellow
+                }
             }
             else if(_currentViewFilter.Type == FilterType.PersonalOnly)
             {
@@ -184,7 +193,26 @@ namespace AcronymLookup.UI
             DefinitionText.Visibility = Visibility.Collapsed;
             CategoryText.Visibility = Visibility.Collapsed;
             NotesContainer.Visibility = Visibility.Collapsed;
-            SourceBadge.Visibility = Visibility.Collapsed; 
+            SourceBadge.Visibility = Visibility.Visible; 
+
+            if(_currentViewFilter.Type == FilterType.All)
+            {
+                SourceText.Text = "ALL";
+                SourceBadge.Background = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(0, 123, 255)); // Blue
+            }
+            else if(_currentViewFilter.Type == FilterType.PersonalOnly)
+            {
+                SourceText.Text = "Personal";
+                SourceBadge.Background = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(40, 167, 69)); // Green
+            }
+            else if(_currentViewFilter.Type == FilterType.SpecificProject)
+            {
+                SourceText.Text = _currentViewFilter.DisplayName;
+                SourceBadge.Background = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(255, 193, 7)); // Yellow
+            }
 
             //show not found
             SearchTermText.Text = $"Searched For: {_searchTerm}";
