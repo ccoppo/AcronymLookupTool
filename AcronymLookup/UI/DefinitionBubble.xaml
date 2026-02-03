@@ -111,11 +111,17 @@
 							</Style>
 						</Border.Style>
 						
-						<TextBlock Name="SourceText"
-								Text="Project"
-								FontSize="10"
-								FontWeight="SemiBold"
-								Foreground="White"/>
+						<StackPanel Orientation="Horizontal">
+							<TextBlock Name="SourceText"
+									Text="ALL"
+									FontSize="10"
+									FontWeight="SemiBold"
+									Foreground="White"/>
+							<TextBlock Text=" ▼"
+									FontSize="8"
+									Foreground="White"
+									Margin="4,0,0,0"/>
+						</StackPanel>
 					</Border>
 					<!-- project selector popup-->
 					<Popup Name="ProjectSelectorPopup"
@@ -130,11 +136,55 @@
                                 Padding="8"
                                 MinWidth="200">
                             <StackPanel>
-                                <TextBlock Text="Switch Project:"
-                                           FontSize="11"
-                                           FontWeight="SemiBold"
-                                           Foreground="#495057"
-                                           Margin="0,0,0,6"/>
+								<Button Name="ViewAllButton"
+									Content="View ALL (Personal + All Projects)"
+									HorizontalAlignment="Stretch"
+									Background="#E7F3FF"
+									BorderBrush="#007BFF"
+									BorderThickness="1"
+									Padding="8,6"
+									Margin="0,0,0,8"
+									FontSize="11"
+									FontWeight="SemiBold"
+									Cursor="Hand"
+									Click="ViewAllButton_Click">
+								<Button.Style>
+									<Style TargetType="Button">
+										<Style.Triggers>
+											<Trigger Property="IsMouseOver" Value="True">
+												<Setter Property="Background" Value="#CCE5FF"/>
+											</Trigger>
+										</Style.Triggers>
+									</Style>
+								</Button.Style>
+							</Button>
+							<Button Name="ViewPersonalButton"
+									Content="View Personal Only"
+									HorizontalAlignment="Stretch"
+									Background="#E8F5E9"
+									BorderBrush="#28A745"
+									BorderThickness="1"
+									Padding="8,6"
+									Margin="0,0,0,8"
+									FontSize="11"
+									FontWeight="SemiBold"
+									Cursor="Hand"
+									Click="ViewPersonalButton_Click">
+								<Button.Style>
+									<Style TargetType="Button">
+										<Style.Triggers>
+											<Trigger Property="IsMouseOver" Value="True">
+												<Setter Property="Background" Value="#C8E6C9"/>
+											</Trigger>
+										</Style.Triggers>
+									</Style>
+								</Button.Style>
+							</Button>
+							<TextBlock Text="Filter by Project:"
+										FontSize="11"
+										FontWeight="SemiBold"
+										Foreground="#495057"
+										Margin="0,0,0,6"/>
                                 
                                 <ListBox Name="ProjectListBox"
                                          BorderThickness="0"

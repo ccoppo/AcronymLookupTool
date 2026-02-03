@@ -16,6 +16,8 @@ namespace AcronymLookup.UI
         private string _searchTerm;
         private string _currentProjectName = "Unknown Project";
         private List<UserProjectInfo> _availableProjects = new List<UserProjectInfo>();
+        private ViewFilterMode _currentViewFilter = ViewFilterMode.CreateAllMode();
+        private List<AbbreviationData> _allAvailableDefinitions = new List<AbbreviationData>();
 
         #region Events 
 
@@ -26,7 +28,8 @@ namespace AcronymLookup.UI
         public event EventHandler<EditTermEventArgs>? EditTermRequested; 
 
         public event EventHandler <DeleteTermEventArgs>? DeleteTermRequested;
-        public event EventHandler <PromoteTermEventArgs>? PromoteTermRequested;  
+        public event EventHandler <PromoteTermEventArgs>? PromoteTermRequested; 
+        public event EventHandler<ViewFilterChangedEventArgs>? ViewFilterChanged; 
 
         #endregion
 
@@ -45,7 +48,7 @@ namespace AcronymLookup.UI
 
         #region Public Methods 
 
-        public void ShowDefinition(string searchTerm, List<AbbreviationData> definitions, string currentProjectName, List<UserProjectInfo> availableProjects)
+        public void ShowDefinition(string searchTerm, List<AbbreviationData> definitions, string currentProjectName, List<UserProjectInfo> availableProjects, ViewFilterMode? viewFilter = null)
         {
             try
             {
@@ -53,9 +56,12 @@ namespace AcronymLookup.UI
 
                 _searchTerm = searchTerm;
                 _currentDefinitions = definitions ?? new List<AbbreviationData>();
-                _currentDefinitionIndex = 0;
                 _currentProjectName = currentProjectName;
                 _availableProjects = availableProjects ?? new List<UserProjectInfo>();
+                _currentViewFilter = viewFilter ?? ViewFilterMode.CreateAllMode(); 
+
+                _currentDefinitions = ApplyViewFilter(_allAvailableDefinitions, _currentViewFilter); 
+                _currentDefinitionIndex = 0;
 
                 if (_currentDefinitions.Any())
                 {
@@ -116,32 +122,35 @@ namespace AcronymLookup.UI
             AbbreviationText.Text = definition.Abbreviation;
             DefinitionText.Text = definition.Definition; 
 
-            if (!string.IsNullOrWhiteSpace(definition.Source))
+            SourceBadge_Click.Visibility = Visibility.Visible; 
+
+            if(_currenViewFilter.Type == FilterType.All)
             {
-                
-                //color code: green personal, blue project
-                if (definition.Source == "Personal")
-                {
-                    SourceText.Text = "Personal";
-                    SourceBadge.Background = new System.Windows.Media.SolidColorBrush( 
-                        System.Windows.Media.Color.FromRgb(40, 167, 69)
-                    );
-                    PromoteButton.Visibility = Visibility.Visible;
-                    PromoteButton.IsEnabled = true;
-                }
-                else if (definition.Source == "Project")
-                {
-                    SourceText.Text = _currentProjectName; 
-                    SourceBadge.Background = new System.Windows.Media.SolidColorBrush( 
-                        System.Windows.Media.Color.FromRgb(0, 123, 255)
-                    );
-                    PromoteButton.Visibility = Visibility.Collapsed;
-                }
-                SourceBadge.Visibility = Visibility.Visible; 
+                SourceText.Text = "ALL"; 
+                SourceBadge.Background = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(0,123,255)); 
+            }
+            else if(_currentViewFilter.Type == FilterType.PersonalOnly)
+            {
+                SourceText.Text = "Personal"; 
+                SourceBadge.Background = new System.Windows.Media.SolidColorBrush(
+                    System.Window.Media.Color.FromRgb(40,167,69)); 
+            }else if(_currentViewFilter.Type == FilterType.SpecificProject)
+            {
+                SourceText.Text = _currentViewFilter.DisplayName; 
+                SourceBadge_Click.Background = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(255,193,7)); 
+            }
+
+            //show promote button only if personal 
+            if (!string.IsNullOrWhiteSpace(definition.Source) && definition.Source == "Personal")
+            {
+                PromoteButton.Visibility = Visibility.Visible;
+                PromoteButton.IsEnabled = true;
             }
             else
             {
-                SourceBadge.Visibility = Visibility.Collapsed; 
+                PromoteButton.Visibility = Visibility.Collapsed;
             }
 
             //show category if present 
@@ -248,6 +257,41 @@ namespace AcronymLookup.UI
                 Logger.Log($"Showing next definition: {_currentDefinitionIndex + 1}/{_currentDefinitions.Count}");
             }
         }
+
+        /// <summary>
+        /// filters definitions based on current view modes
+        /// </summary>
+        /// <param name="allDefinitions"></param>
+        /// <param name="filter"></param>
+        /// <returns></returns>
+        private List<AbbreviationData> ApplyViewFilter(List<AbbreviationData> allDefinitions, ViewFilterMode filter)
+        {
+            switch (filter.Type)
+            {
+                case FilterType.All:
+                    // Show everything
+                    return new List<AbbreviationData>(allDefinitions);
+
+                case FilterType.PersonalOnly:
+                    // Only personal terms
+                    return allDefinitions.Where(d => d.Source == "Personal").ToList();
+
+                case FilterType.SpecificProject:
+                    // Only terms from the specified project
+                    var projectCode = _availableProjects
+                        .FirstOrDefault(p => p.ProjectID == filter.ProjectID)?.ProjectCode;
+                    
+                    if (projectCode == null)
+                        return new List<AbbreviationData>();
+                        
+                    return allDefinitions.Where(d => d.Source == projectCode).ToList();
+
+                default:
+                    return new List<AbbreviationData>(allDefinitions);
+            }
+        }
+
+
 
         #endregion
 
@@ -437,6 +481,113 @@ namespace AcronymLookup.UI
             }
         }
 
+        private void SourceBadge_Click(object sender, MouseButtonEventArgs e)
+        {
+            try
+            {
+                Logger.Log("Source badge clicked - opening view filter menu");
+                
+                // Populate the project list with ALL available projects
+                ProjectListBox.ItemsSource = _availableProjects;
+                
+                // Show the popup
+                ProjectSelectorPopup.IsOpen = true;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error opening view filter menu: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Show all available definitions
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void ViewAllButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Logger.Log("View ALL button clicked");
+
+                //close the popup
+                ProjectSelectorPopup.IsOpen = false;
+
+                //create ALL filter mode
+                var allFilter = ViewFilterMode.CreateAllMode();
+
+                //raise event to request re-search with new filter
+                var args = new ViewFilterChangedEventArgs(allFilter, _searchTerm);
+                ViewFilterChanged?.Invoke(this, args);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error handling View ALL button: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// handles view personal only
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void ViewPersonalButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Logger.Log("View Personal Only button clicked");
+
+                //close popup
+                ProjectSelectorPopup.IsOpen = false;
+
+                //create Personal filter mode
+                var personalFilter = ViewFilterMode.CreatePersonalMode();
+
+                //raise event to request re-search with applied filter
+                var args = new ViewFilterChangedEventArgs(personalFilter, _searchTerm);
+                ViewFilterChanged?.Invoke(this, args);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error handling View Personal button: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// handles project selection from the list 
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void ProjectListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            try
+            {
+                if (ProjectListBox.SelectedItem is UserProjectInfo selectedProject)
+                {
+                    Logger.Log($"User selected project filter: {selectedProject.DisplayName}");
+                    
+                    //close popup
+                    ProjectSelectorPopup.IsOpen = false;
+
+                    //create project-specific filter
+                    var projectFilter = ViewFilterMode.CreateProjectMode(
+                        selectedProject.ProjectID, 
+                        selectedProject.ProjectCode);
+
+                    //raise event to request re-search with filter
+                    var args = new ViewFilterChangedEventArgs(projectFilter, _searchTerm);
+                    ViewFilterChanged?.Invoke(this, args);
+
+                    //clear selection 
+                    ProjectListBox.SelectedItem = null;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error handling project selection: {ex.Message}");
+            }
+        }
+
 
         protected override void OnClosed(EventArgs e)
         {
@@ -493,7 +644,17 @@ namespace AcronymLookup.UI
             }
         }
 
-        
+        public class ViewFilterChangedEventArgs : EventArgs
+        {
+            public ViewFilterMode NewFilter { get; }
+            public string SearchTerm { get; }
+
+            public ViewFilterChangedEventArgs(ViewFilterMode newFilter, string searchTerm)
+            {
+                NewFilter = newFilter;
+                SearchTerm = searchTerm;
+            }
+        }
 
         #endregion
     }

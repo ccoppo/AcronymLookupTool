@@ -353,11 +353,10 @@ namespace AcronymLookup
                     Logger.Log($"Looking up: '{searchTerm}'");
 
                     // Search ALL (personal + project)
-                    var searchResult = _searchService.Search(
+                    var searchResult = _searchService.SearchAllProjects(
                         searchTerm, 
-                        SearchScope.All, 
                         _databaseHandler.CurrentUserId, 
-                        _databaseHandler.CurrentProjectId);
+                        _userProjects);
 
                     if (searchResult.HasResults)
                     {
@@ -440,6 +439,7 @@ namespace AcronymLookup
                 _currentBubble.EditTermRequested += OnEditTermRequested;
                 _currentBubble.DeleteTermRequested += OnDeleteTermRequested;
                 _currentBubble.PromoteTermRequested += OnPromoteTermRequested;
+                _currentBubble.ViewFilterChanged += OnViewFilterChanged;
 
                 string currentProjectName = _currentProject?.ProjectCode ?? "Unknown Project"; 
                 List <UserProjectInfo> availableProjects = GetAvailableProjects(); 
@@ -489,6 +489,7 @@ namespace AcronymLookup
                     _currentBubble.EditTermRequested -= OnEditTermRequested;
                     _currentBubble.DeleteTermRequested -= OnDeleteTermRequested;
                     _currentBubble.PromoteTermRequested -= OnPromoteTermRequested; 
+                    _currentBubble.ViewFilterChanged -= OnViewFilterChanged;
                     _currentBubble.CloseBubble();
                     _currentBubble = null; 
                 }
@@ -537,6 +538,7 @@ namespace AcronymLookup
                     _currentBubble.EditTermRequested -= OnEditTermRequested; 
                     _currentBubble.DeleteTermRequested -= OnDeleteTermRequested; 
                     _currentBubble.PromoteTermRequested -= OnPromoteTermRequested; 
+                    _currentBubble.ViewFilterChanged -= OnViewFilterChanged;
 
                     _currentBubble = null; 
                 }
@@ -1128,11 +1130,95 @@ namespace AcronymLookup
             }
         }
 
+
         /// <summary>
-        /// Handles project switch request from the definition
+        /// User changes project filter
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
+        private void OnViewFilterChanged(object? sender, DefinitionBubble.ViewFilterChangedEventArgs e)
+        {
+            try
+            {
+                Logger.Log($"View filter changed to: {e.NewFilter.DisplayName}");
+
+                if (_searchService == null || _databaseHandler == null)
+                {
+                    Logger.Log("Required services not available");
+                    return;
+                }
+
+                int userId = _databaseHandler.CurrentUserId;
+
+                // Perform search based on filter type
+                List<AbbreviationData> filteredResults;
+
+                switch (e.NewFilter.Type)
+                {
+                    case FilterType.All:
+                        // Search ALL projects + personal
+                        Logger.Log("Searching ALL projects and personal");
+                        var allResults = _searchService.SearchAllProjects(e.SearchTerm, userId, _userProjects);
+                        filteredResults = SearchService.GetAllResultsAsList(allResults);
+                        break;
+
+                    case FilterType.PersonalOnly:
+                        // Search only personal
+                        Logger.Log("Searching Personal only");
+                        var personalResults = _searchService.Search(e.SearchTerm, SearchScope.Personal, userId, 0);
+                        filteredResults = SearchService.GetAllResultsAsList(personalResults);
+                        break;
+
+                    case FilterType.SpecificProject:
+                        // Search specific project only
+                        if (!e.NewFilter.ProjectID.HasValue)
+                        {
+                            Logger.Log("Project filter has no ProjectID");
+                            filteredResults = new List<AbbreviationData>();
+                            break;
+                        }
+
+                        Logger.Log($"Searching specific project: {e.NewFilter.DisplayName}");
+                        var projectResults = _searchService.Search(
+                            e.SearchTerm, 
+                            SearchScope.Project, 
+                            userId, 
+                            e.NewFilter.ProjectID.Value);
+                        filteredResults = SearchService.GetAllResultsAsList(projectResults);
+                        break;
+
+                    default:
+                        Logger.Log("Unknown filter type");
+                        filteredResults = new List<AbbreviationData>();
+                        break;
+                }
+
+                // Update the bubble with filtered results
+                if (_currentBubble != null)
+                {
+                    string currentProjectName = _currentProject?.ProjectCode ?? "Unknown Project";
+                    List<UserProjectInfo> availableProjects = GetAvailableProjects();
+
+                    _currentBubble.ShowDefinition(
+                        e.SearchTerm, 
+                        filteredResults, 
+                        currentProjectName, 
+                        availableProjects,
+                        e.NewFilter); // PASS THE FILTER SO BUBBLE KNOWS CURRENT STATE
+
+                    Logger.Log($"Bubble updated with {filteredResults.Count} filtered results");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error handling view filter change: {ex.Message}");
+                MessageBox.Show(
+                    $"Error applying filter: {ex.Message}",
+                    "Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
         
         #endregion
 

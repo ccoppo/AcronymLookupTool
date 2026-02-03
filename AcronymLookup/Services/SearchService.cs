@@ -102,6 +102,63 @@ namespace AcronymLookup.Services
         }
 
         /// <summary>
+        /// searches across all projects the user has access to 
+        /// </summary>
+        /// <param name="searchTerm"></param>
+        /// <param name="userId"></param>
+        /// <param name="userProjects"></param>
+        /// <returns></returns>
+        public SearchResult SearchAllProjects(string searchTerm, int userId, List<UserProjectInfo> userProjects)
+        {
+            if (string.IsNullOrWhiteSpace(searchTerm))
+            {
+                return SearchResult.CreateEmpty(searchTerm);
+            }
+
+            Logger.Log($"Searching ALL projects for '{searchTerm}'");
+
+            var result = new SearchResult
+            {
+                SearchTerm = searchTerm,
+                Scope = SearchScope.All
+            };
+
+            try
+            {
+                // Search personal database first
+                var personalTerm = _personalDatabaseService.FindPersonalAbbreviation(searchTerm, userId);
+                if (personalTerm != null)
+                {
+                    result.PersonalResults.Add(CreateSearchResultItem(personalTerm, "Personal"));
+                }
+
+                // Search each project the user has access to
+                foreach (var project in userProjects)
+                {
+                    // Temporarily set context to this project
+                    _databaseHandler.SetUserContext(userId, project.ProjectID);
+                    
+                    var projectTerm = _databaseHandler.FindAbbreviation(searchTerm);
+                    
+                    if (projectTerm != null)
+                    {
+                        // CREATE RESULT WITH PROJECT-SPECIFIC SOURCE
+                        var resultItem = CreateSearchResultItem(projectTerm, project.ProjectCode);
+                        result.ProjectResults.Add(resultItem);
+                    }
+                }
+
+                Logger.Log($"Search ALL: Personal = {result.PersonalResults.Count}, Projects = {result.ProjectResults.Count}");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error in SearchAllProjects: {ex.Message}");
+            }
+
+            return result;
+        }
+
+        /// <summary>
         /// only search personal database 
         /// </summary>
         /// <param name="searchTerm"></param>
