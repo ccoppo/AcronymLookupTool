@@ -55,7 +55,7 @@ namespace AcronymLookup.UI
                 Logger.Log($"Showing definition for: '{searchTerm}'");
 
                 _searchTerm = searchTerm;
-                _currentDefinitions = definitions ?? new List<AbbreviationData>();
+                _allAvailableDefinitions = definitions ?? new List<AbbreviationData>();
                 _currentProjectName = currentProjectName;
                 _availableProjects = availableProjects ?? new List<UserProjectInfo>();
                 _currentViewFilter = viewFilter ?? ViewFilterMode.CreateAllMode(); 
@@ -122,9 +122,9 @@ namespace AcronymLookup.UI
             AbbreviationText.Text = definition.Abbreviation;
             DefinitionText.Text = definition.Definition; 
 
-            SourceBadge_Click.Visibility = Visibility.Visible; 
+            SourceBadge.Visibility = Visibility.Visible; 
 
-            if(_currenViewFilter.Type == FilterType.All)
+            if(_currentViewFilter.Type == FilterType.All)
             {
                 SourceText.Text = "ALL"; 
                 SourceBadge.Background = new System.Windows.Media.SolidColorBrush(
@@ -134,11 +134,11 @@ namespace AcronymLookup.UI
             {
                 SourceText.Text = "Personal"; 
                 SourceBadge.Background = new System.Windows.Media.SolidColorBrush(
-                    System.Window.Media.Color.FromRgb(40,167,69)); 
+                    System.Windows.Media.Color.FromRgb(40,167,69)); 
             }else if(_currentViewFilter.Type == FilterType.SpecificProject)
             {
                 SourceText.Text = _currentViewFilter.DisplayName; 
-                SourceBadge_Click.Background = new System.Windows.Media.SolidColorBrush(
+                SourceBadge.Background = new System.Windows.Media.SolidColorBrush(
                     System.Windows.Media.Color.FromRgb(255,193,7)); 
             }
 
