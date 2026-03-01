@@ -11,7 +11,8 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
-using AcronymLookup.Utilities; 
+using AcronymLookup.Utilities;
+using AcronymLookup.Models; 
 
 namespace AcronymLookup.UI
 {
@@ -141,6 +142,13 @@ namespace AcronymLookup.UI
                 
                 Logger.Log($"Attempting to save term to {selectedDatabase} database");
 
+                int? selectedProjectId = null; 
+                if(selectedDatabase == "Project" && ProjectSelector.SelectedItem is UserProjectInfo selectedProject)
+                {
+                    selectedProjectId = selectedProject.ProjectID;
+                    Logger.Log($"Selected project: {selectedProject.DisplayName}"); 
+                }
+
 
                 var args = new TermAddedEventArgs(abbreviation, definition, category, notes, selectedDatabase, selectedProjectId);
                 TermAdded?.Invoke(this, args);
@@ -161,7 +169,7 @@ namespace AcronymLookup.UI
         {
             try
             {
-                var selectedItem = (ComboBoxItem)DatabaseSelector_SelectionChanged.SelectedItem; 
+                var selectedItem = (ComboBoxItem)DatabaseSelector.SelectedItem; 
                 string selectedDatabase = selectedItem?.Tag?.ToString() ?? "Personal"; 
 
                 if (selectedDatabase == "Project" && _canAddToProject)
