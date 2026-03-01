@@ -30,6 +30,7 @@ namespace AcronymLookup.UI
         public event EventHandler <DeleteTermEventArgs>? DeleteTermRequested;
         public event EventHandler <PromoteTermEventArgs>? PromoteTermRequested; 
         public event EventHandler<ViewFilterChangedEventArgs>? ViewFilterChanged; 
+        public event EventHandler? OpenApprovalQueueRequested;
 
         #endregion
 
@@ -91,6 +92,16 @@ namespace AcronymLookup.UI
                 Logger.Log($"Error showing definition: {ex.Message}");
                 ShowErrorMessage($"Error displaying definition: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Called by App.xaml.cs after permission check.
+        /// Shows the queue button for Moderators/Managers/Admins.
+        /// </summary>
+        public void SetCanApproveRequests(bool canApprove)
+        {
+            ApprovalQueueButton.Visibility = canApprove ? Visibility.Visible : Visibility.Collapsed;
+            Logger.Log($"Approval queue button visible: {canApprove}");
         }
 
         /// <summary>
@@ -550,6 +561,19 @@ namespace AcronymLookup.UI
             catch (Exception ex)
             {
                 Logger.Log($"Error handling promote button: {ex.Message}");
+            }
+        }
+
+        private void ApprovalQueueButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Logger.Log("Approval queue button clicked");
+                OpenApprovalQueueRequested?.Invoke(this, EventArgs.Empty);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error opening approval queue: {ex.Message}");
             }
         }
 

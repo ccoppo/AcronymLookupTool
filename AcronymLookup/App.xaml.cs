@@ -440,11 +440,20 @@ namespace AcronymLookup
                 _currentBubble.DeleteTermRequested += OnDeleteTermRequested;
                 _currentBubble.PromoteTermRequested += OnPromoteTermRequested;
                 _currentBubble.ViewFilterChanged += OnViewFilterChanged;
+                _currentBubble.OpenApprovalQueueRequested += OnOpenApprovalQueueRequested;
 
                 string currentProjectName = _currentProject?.ProjectCode ?? "Unknown Project"; 
                 List <UserProjectInfo> availableProjects = GetAvailableProjects(); 
 
                 _currentBubble.ShowDefinition(searchTerm, definitions, currentProjectName, availableProjects); 
+
+                // Check if user can approve, then show/hide the queue button
+                bool canApprove = _permissionService != null &&
+                                _databaseHandler != null &&
+                                _permissionService.CanApproveRequests(
+                                    _databaseHandler.CurrentUserId,
+                                    _databaseHandler.CurrentProjectId);
+                _currentBubble.SetCanApproveRequests(canApprove);
 
                 Console.WriteLine("Definition bubble displayed"); 
             }catch (Exception ex)
@@ -490,6 +499,7 @@ namespace AcronymLookup
                     _currentBubble.DeleteTermRequested -= OnDeleteTermRequested;
                     _currentBubble.PromoteTermRequested -= OnPromoteTermRequested; 
                     _currentBubble.ViewFilterChanged -= OnViewFilterChanged;
+                    _currentBubble.OpenApprovalQueueRequested -= OnOpenApprovalQueueRequested;
                     _currentBubble.CloseBubble();
                     _currentBubble = null; 
                 }
@@ -539,6 +549,7 @@ namespace AcronymLookup
                     _currentBubble.DeleteTermRequested -= OnDeleteTermRequested; 
                     _currentBubble.PromoteTermRequested -= OnPromoteTermRequested; 
                     _currentBubble.ViewFilterChanged -= OnViewFilterChanged;
+                    _currentBubble.OpenApprovalQueueRequested -= OnOpenApprovalQueueRequested;
 
                     _currentBubble = null; 
                 }
@@ -1246,6 +1257,52 @@ namespace AcronymLookup
                 Logger.Log($"Error handling view filter change: {ex.Message}");
                 MessageBox.Show(
                     $"Error applying filter: {ex.Message}",
+                    "Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// Opens the approval queue modal for Moderators / Managers / Admins.
+        /// </summary>
+        private void OnOpenApprovalQueueRequested(object? sender, EventArgs e)
+        {
+            try
+            {
+                Logger.Log("Opening approval queue");
+
+                if (_databaseHandler == null || _permissionService == null)
+                {
+                    Logger.Log("Required services not available");
+                    return;
+                }
+
+                int userId    = _databaseHandler.CurrentUserId;
+                int projectId = _databaseHandler.CurrentProjectId;
+
+                // Re-verify permission before opening (defence in depth)
+                if (!_permissionService.CanApproveRequests(userId, projectId))
+                {
+                    Logger.Log("User does not have permission to approve requests");
+                    MessageBox.Show(
+                        "You do not have permission to review requests.",
+                        "Permission Denied",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                var queueWindow = new ApprovalQueueWindow(_databaseHandler, projectId, userId);
+                queueWindow.ShowDialog();
+
+                Logger.Log("Approval queue closed");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error opening approval queue: {ex.Message}");
+                MessageBox.Show(
+                    $"Error opening approval queue:\n\n{ex.Message}",
                     "Error",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);

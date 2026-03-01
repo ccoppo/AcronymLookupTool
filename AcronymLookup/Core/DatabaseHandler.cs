@@ -679,5 +679,360 @@ namespace AcronymLookup.Core
         }
 
         #endregion
+
+        #region Approval Queue Methods
+
+        /// <summary>
+        /// Returns all Pending TermRequests for the given project.
+        /// Joins Users table so the reviewer sees a real display name.
+        /// </summary>
+        public List<TermRequest> GetPendingRequests(int projectId)
+        {
+            var results = new List<TermRequest>();
+
+            try
+            {
+                string query = @"
+                    SELECT
+                        tr.TermRequestID,
+                        tr.ProjectID,
+                        tr.RequestedByUserID,
+                        u.FullName             AS RequestedByUserName,
+                        tr.RequestType,
+                        tr.NewAbbreviation,
+                        tr.NewDefinition,
+                        tr.NewCategory,
+                        tr.NewNotes,
+                        tr.AbbreviationID,
+                        tr.EditedDefinition,
+                        tr.EditedCategory,
+                        tr.EditedNotes,
+                        tr.RequestReason,
+                        tr.DateRequested,
+                        tr.Status,
+                        -- For Edit/Delete requests, pull the existing abbreviation text
+                        a.Abbreviation         AS ExistingAbbreviation
+                    FROM TermRequests tr
+                    INNER JOIN Users u ON tr.RequestedByUserID = u.UserID
+                    LEFT JOIN Abbreviations a ON tr.AbbreviationID = a.AbbreviationID
+                    WHERE tr.ProjectID = @ProjectID
+                    AND tr.Status = 'Pending'
+                    ORDER BY tr.DateRequested ASC";
+
+                using (SqlConnection connection = new SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    using (SqlCommand command = new SqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@ProjectID", projectId);
+
+                        using (SqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                string requestType = reader.GetString(4);
+
+                                // For Edit/Delete, use the existing abbreviation text from the JOIN.
+                                // For Add, use NewAbbreviation directly.
+                                string displayAbbreviation = requestType == "Add"
+                                    ? (reader.IsDBNull(5)  ? string.Empty : reader.GetString(5))
+                                    : (reader.IsDBNull(16) ? string.Empty : reader.GetString(16));
+
+                                var request = new TermRequest
+                                {
+                                    TermRequestID        = reader.GetInt32(0),
+                                    ProjectID            = reader.GetInt32(1),
+                                    RequestedByUserID    = reader.GetInt32(2),
+                                    RequestedByUserName  = reader.IsDBNull(3) ? "Unknown" : reader.GetString(3),
+                                    RequestType          = requestType,
+                                    NewAbbreviation      = displayAbbreviation,   // normalised above
+                                    NewDefinition        = reader.IsDBNull(6)  ? null : reader.GetString(6),
+                                    NewCategory          = reader.IsDBNull(7)  ? null : reader.GetString(7),
+                                    NewNotes             = reader.IsDBNull(8)  ? null : reader.GetString(8),
+                                    AbbreviationID       = reader.IsDBNull(9)  ? null : reader.GetInt32(9),
+                                    EditedDefinition     = reader.IsDBNull(10) ? null : reader.GetString(10),
+                                    EditedCategory       = reader.IsDBNull(11) ? null : reader.GetString(11),
+                                    EditedNotes          = reader.IsDBNull(12) ? null : reader.GetString(12),
+                                    RequestReason        = reader.IsDBNull(13) ? null : reader.GetString(13),
+                                    DateRequested        = reader.GetDateTime(14),
+                                    Status               = reader.GetString(15),
+                                };
+
+                                results.Add(request);
+                            }
+                        }
+                    }
+                }
+
+                Logger.Log($"Retrieved {results.Count} pending request(s) for project {projectId}");
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error getting pending requests: {ex.Message}");
+            }
+
+            return results;
+        }
+
+        /// <summary>
+        /// Approves a pending TermRequest.
+        /// For Add:    inserts the term into Abbreviations + AbbreviationProjects.
+        /// For Edit:   applies the proposed changes to the existing Abbreviations row.
+        /// For Delete: soft-deletes the existing Abbreviations row.
+        /// All three then mark the request Approved in TermRequests.
+        /// Everything runs in a single transaction.
+        /// </summary>
+        public bool ApproveRequest(int termRequestId, int reviewerUserId, string? reviewComment = null)
+        {
+            try
+            {
+                // Load the full request first (outside the transaction — read-only)
+                TermRequest? request = GetRequestById(termRequestId);
+                if (request == null)
+                {
+                    Logger.Log($"ApproveRequest: TermRequestID {termRequestId} not found");
+                    return false;
+                }
+
+                using (SqlConnection connection = new SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    using (SqlTransaction transaction = connection.BeginTransaction())
+                    {
+                        try
+                        {
+                            // ── 1. Apply the requested change ────────────────────────────
+
+                            if (request.RequestType == "Add")
+                            {
+                                // Insert new term into Abbreviations
+                                string insertAbbrev = @"
+                                    INSERT INTO Abbreviations
+                                        (Abbreviation, Definition, Category, Notes,
+                                        CreatedBy, CreatedByUserID, IsActive)
+                                    VALUES
+                                        (@Abbreviation, @Definition, @Category, @Notes,
+                                        'Approved Request', @CreatedByUserID, 1);
+                                    SELECT CAST(SCOPE_IDENTITY() AS INT);";
+
+                                int newAbbrevId;
+                                using (SqlCommand cmd = new SqlCommand(insertAbbrev, connection, transaction))
+                                {
+                                    cmd.Parameters.AddWithValue("@Abbreviation",     request.NewAbbreviation!.Trim().ToUpper());
+                                    cmd.Parameters.AddWithValue("@Definition",       request.NewDefinition ?? string.Empty);
+                                    cmd.Parameters.AddWithValue("@Category",         string.IsNullOrWhiteSpace(request.NewCategory) ? DBNull.Value : request.NewCategory.Trim());
+                                    cmd.Parameters.AddWithValue("@Notes",            string.IsNullOrWhiteSpace(request.NewNotes)    ? DBNull.Value : request.NewNotes.Trim());
+                                    cmd.Parameters.AddWithValue("@CreatedByUserID",  request.RequestedByUserID);
+                                    newAbbrevId = (int)cmd.ExecuteScalar();
+                                }
+
+                                // Link to project
+                                string linkProject = @"
+                                    INSERT INTO AbbreviationProjects
+                                        (AbbreviationID, ProjectID, AddedByUserID, IsActive)
+                                    VALUES
+                                        (@AbbreviationID, @ProjectID, @AddedByUserID, 1)";
+
+                                using (SqlCommand cmd = new SqlCommand(linkProject, connection, transaction))
+                                {
+                                    cmd.Parameters.AddWithValue("@AbbreviationID",  newAbbrevId);
+                                    cmd.Parameters.AddWithValue("@ProjectID",        request.ProjectID);
+                                    cmd.Parameters.AddWithValue("@AddedByUserID",    reviewerUserId);
+                                    cmd.ExecuteNonQuery();
+                                }
+                            }
+                            else if (request.RequestType == "Edit" && request.AbbreviationID.HasValue)
+                            {
+                                string updateAbbrev = @"
+                                    UPDATE Abbreviations
+                                    SET Definition     = @Definition,
+                                        Category       = @Category,
+                                        Notes          = @Notes,
+                                        ModifiedBy     = 'Approved Request',
+                                        ModifiedByUserID = @ModifiedByUserID,
+                                        DateModified   = GETDATE()
+                                    WHERE AbbreviationID = @AbbreviationID
+                                    AND IsActive = 1";
+
+                                using (SqlCommand cmd = new SqlCommand(updateAbbrev, connection, transaction))
+                                {
+                                    cmd.Parameters.AddWithValue("@Definition",       request.EditedDefinition ?? string.Empty);
+                                    cmd.Parameters.AddWithValue("@Category",         string.IsNullOrWhiteSpace(request.EditedCategory) ? DBNull.Value : request.EditedCategory.Trim());
+                                    cmd.Parameters.AddWithValue("@Notes",            string.IsNullOrWhiteSpace(request.EditedNotes)    ? DBNull.Value : request.EditedNotes.Trim());
+                                    cmd.Parameters.AddWithValue("@ModifiedByUserID", reviewerUserId);
+                                    cmd.Parameters.AddWithValue("@AbbreviationID",   request.AbbreviationID.Value);
+                                    cmd.ExecuteNonQuery();
+                                }
+                            }
+                            else if (request.RequestType == "Delete" && request.AbbreviationID.HasValue)
+                            {
+                                string softDelete = @"
+                                    UPDATE Abbreviations
+                                    SET IsActive         = 0,
+                                        ModifiedBy       = 'Approved Deletion',
+                                        ModifiedByUserID = @ModifiedByUserID,
+                                        DateModified     = GETDATE()
+                                    WHERE AbbreviationID = @AbbreviationID
+                                    AND IsActive = 1";
+
+                                using (SqlCommand cmd = new SqlCommand(softDelete, connection, transaction))
+                                {
+                                    cmd.Parameters.AddWithValue("@ModifiedByUserID", reviewerUserId);
+                                    cmd.Parameters.AddWithValue("@AbbreviationID",   request.AbbreviationID.Value);
+                                    cmd.ExecuteNonQuery();
+                                }
+                            }
+
+                            // ── 2. Mark request as Approved ──────────────────────────────
+                            MarkRequestReviewed(termRequestId, "Approved", reviewerUserId, reviewComment, connection, transaction);
+
+                            transaction.Commit();
+                            Logger.Log($"Approved TermRequestID {termRequestId} (type: {request.RequestType})");
+                            return true;
+                        }
+                        catch (Exception ex)
+                        {
+                            transaction.Rollback();
+                            Logger.Log($"ApproveRequest transaction rolled back: {ex.Message}");
+                            return false;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error approving request: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Rejects a pending TermRequest — only updates the TermRequests row.
+        /// No changes are made to Abbreviations.
+        /// </summary>
+        public bool RejectRequest(int termRequestId, int reviewerUserId, string? reviewComment = null)
+        {
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    using (SqlTransaction transaction = connection.BeginTransaction())
+                    {
+                        try
+                        {
+                            MarkRequestReviewed(termRequestId, "Rejected", reviewerUserId, reviewComment, connection, transaction);
+                            transaction.Commit();
+                            Logger.Log($"Rejected TermRequestID {termRequestId}");
+                            return true;
+                        }
+                        catch (Exception ex)
+                        {
+                            transaction.Rollback();
+                            Logger.Log($"RejectRequest transaction rolled back: {ex.Message}");
+                            return false;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error rejecting request: {ex.Message}");
+                return false;
+            }
+        }
+
+        // ── Private helpers ───────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Loads a single TermRequest by ID (used internally before transactions).
+        /// </summary>
+        private TermRequest? GetRequestById(int termRequestId)
+        {
+            try
+            {
+                string query = @"
+                    SELECT
+                        tr.TermRequestID, tr.ProjectID, tr.RequestedByUserID,
+                        tr.RequestType,
+                        tr.NewAbbreviation, tr.NewDefinition, tr.NewCategory, tr.NewNotes,
+                        tr.AbbreviationID,
+                        tr.EditedDefinition, tr.EditedCategory, tr.EditedNotes,
+                        tr.RequestReason, tr.DateRequested, tr.Status
+                    FROM TermRequests tr
+                    WHERE tr.TermRequestID = @TermRequestID";
+
+                using (SqlConnection connection = new SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    using (SqlCommand command = new SqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@TermRequestID", termRequestId);
+                        using (SqlDataReader reader = command.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                return new TermRequest
+                                {
+                                    TermRequestID     = reader.GetInt32(0),
+                                    ProjectID         = reader.GetInt32(1),
+                                    RequestedByUserID = reader.GetInt32(2),
+                                    RequestType       = reader.GetString(3),
+                                    NewAbbreviation   = reader.IsDBNull(4)  ? null : reader.GetString(4),
+                                    NewDefinition     = reader.IsDBNull(5)  ? null : reader.GetString(5),
+                                    NewCategory       = reader.IsDBNull(6)  ? null : reader.GetString(6),
+                                    NewNotes          = reader.IsDBNull(7)  ? null : reader.GetString(7),
+                                    AbbreviationID    = reader.IsDBNull(8)  ? null : reader.GetInt32(8),
+                                    EditedDefinition  = reader.IsDBNull(9)  ? null : reader.GetString(9),
+                                    EditedCategory    = reader.IsDBNull(10) ? null : reader.GetString(10),
+                                    EditedNotes       = reader.IsDBNull(11) ? null : reader.GetString(11),
+                                    RequestReason     = reader.IsDBNull(12) ? null : reader.GetString(12),
+                                    DateRequested     = reader.GetDateTime(13),
+                                    Status            = reader.GetString(14),
+                                };
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error loading request by ID: {ex.Message}");
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Shared helper: stamps the review outcome onto a TermRequests row.
+        /// Must be called inside an open transaction.
+        /// </summary>
+        private static void MarkRequestReviewed(
+            int termRequestId,
+            string status,
+            int reviewerUserId,
+            string? reviewComment,
+            SqlConnection connection,
+            SqlTransaction transaction)
+        {
+            string update = @"
+                UPDATE TermRequests
+                SET Status           = @Status,
+                    ReviewedByUserID = @ReviewedByUserID,
+                    ReviewComment    = @ReviewComment,
+                    DateReviewed     = GETDATE()
+                WHERE TermRequestID = @TermRequestID";
+
+            using (SqlCommand cmd = new SqlCommand(update, connection, transaction))
+            {
+                cmd.Parameters.AddWithValue("@Status",           status);
+                cmd.Parameters.AddWithValue("@ReviewedByUserID", reviewerUserId);
+                cmd.Parameters.AddWithValue("@ReviewComment",    string.IsNullOrWhiteSpace(reviewComment) ? DBNull.Value : reviewComment!.Trim());
+                cmd.Parameters.AddWithValue("@TermRequestID",    termRequestId);
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        #endregion
     }
 }
