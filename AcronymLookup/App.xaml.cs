@@ -758,7 +758,8 @@ namespace AcronymLookup
                 }
 
                 int userId = _databaseHandler.CurrentUserId;
-                int projectId = _databaseHandler.CurrentProjectId;
+                //int projectId = _databaseHandler.CurrentProjectId;
+                int projectId = ResolveProjectIdFromSource(e.Term.Source); 
 
                 // FIX: base isPersonalTerm on the term's actual source, not existence in personal DB
                 bool isPersonalTerm = e.Term.Source == "Personal";
@@ -946,7 +947,9 @@ namespace AcronymLookup
                 }
 
                 int userId = _databaseHandler.CurrentUserId;
-                int projectId = _databaseHandler.CurrentProjectId;
+                //int projectId = _databaseHandler.CurrentProjectId;
+
+                int projectId = ResolveProjectIdFromSource(e.Term.Source);
 
                 // Check if this is a personal term
                 var personalTerm = _personalDatabaseService.FindPersonalAbbreviation(e.Term.Abbreviation, userId);
@@ -1356,6 +1359,29 @@ namespace AcronymLookup
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
             }
+        }
+
+        /// <summary>
+        /// Resolves the correct ProjectID for a term action based on the term's source.
+        /// When in "All Projects" view, Source is set to the ProjectCode (e.g. "Dev"),
+        /// not "Project". CurrentProjectId may point to the wrong project after SearchAllProjects loops.
+        /// </summary>
+        private int ResolveProjectIdFromSource(string source)
+        {
+            // Personal terms and single-project context — CurrentProjectId is correct
+            if (source == "Personal" || source == "Project")
+                return _databaseHandler?.CurrentProjectId ?? 0;
+
+            // Source is a ProjectCode from "All Projects" view — look it up
+            var match = _userProjects.FirstOrDefault(p => p.ProjectCode == source);
+            if (match != null)
+            {
+                Logger.Log($"Resolved ProjectID {match.ProjectID} from source '{source}'");
+                return match.ProjectID;
+            }
+
+            Logger.Log($"Could not resolve ProjectID from source '{source}', falling back to CurrentProjectId");
+            return _databaseHandler?.CurrentProjectId ?? 0;
         }
         
         #endregion
