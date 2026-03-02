@@ -48,6 +48,7 @@ namespace AcronymLookup
         private SearchService? _searchService;
         private List<UserProjectInfo> _userProjects = new List<UserProjectInfo>();
         private UserProjectInfo? _currentProject = null;
+        private string _connectionString = "";
 
 
 
@@ -134,6 +135,9 @@ namespace AcronymLookup
             string connectionString = configuration.GetConnectionString("AzureDatabase")
                 ?? throw new InvalidOperationException("Connection string not found in user secrets");
 
+            //connectionstring updates for debug
+            _connectionString = connectionString;
+
             //Initialize AuditService (needed by DatabaseHandler) 
             _auditService = new AuditService(connectionString);
             Logger.Log("Initialized AuditService");
@@ -210,13 +214,30 @@ namespace AcronymLookup
             {
                 bool connected = _databaseHandler.TestConnection();
 
+                #if DEBUG
+                    var switcher = new DebugUserSwitcher(_connectionString);
+                    bool impersonating = switcher.ShowDialog() == true;
+                    int? debugUserId = impersonating ? switcher.SelectedUserId : null;
+                    Logger.Log(impersonating && debugUserId.HasValue
+                        ? $"[DEBUG] Startup impersonating UserID {debugUserId}"
+                        : "[DEBUG] Using real Windows auth");
+                #endif
+
                 if (connected)
                 {
 
                     string windowsUsername = System.Security.Principal.WindowsIdentity.GetCurrent().Name;
                     Logger.Log($"current windows user: {windowsUsername}");
 
-                    int? userId = _databaseHandler.GetUserIdByWindowsUsername(windowsUsername);
+                    //int? userId = _databaseHandler.GetUserIdByWindowsUsername(windowsUsername);
+
+                    #if DEBUG
+                        userId = impersonating && debugUserId.HasValue
+                            ? debugUserId
+                            : _databaseHandler.GetUserIdByWindowsUsername(windowsUsername);
+                    #else
+                        userId = _databaseHandler.GetUserIdByWindowsUsername(windowsUsername);
+                    #endif
 
                     if (userId.HasValue)
                     {
