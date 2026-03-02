@@ -322,7 +322,7 @@ namespace AcronymLookup.Services
                             string updatePersonalQuery = @"
                                 UPDATE PersonalAbbreviations 
                                 SET RequestedForProjectID = @ProjectID, 
-                                    RequestedStatus = 'Requested' 
+                                    RequestStatus = 'Requested' 
                                 WHERE UserID = @UserID 
                                     AND UPPER(Abbreviation) = @Abbreviation
                                     AND IsActive = 1";
