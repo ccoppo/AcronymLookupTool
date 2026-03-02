@@ -157,6 +157,12 @@ namespace AcronymLookup.Services
             return permissions.CanApproveRequests; 
         }
 
+        public bool CanRequestEdits(int userId, int projectId)
+        {
+            var permissions = GetUserPermissions(userId, projectId);
+            return permissions.CanRequestEdits;
+        }
+
         public string GetPermissionSummary(int userId, int projectId)
         {
             var permissions = GetUserPermissions(userId, projectId);

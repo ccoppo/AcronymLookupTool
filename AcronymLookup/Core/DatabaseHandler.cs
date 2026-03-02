@@ -649,6 +649,74 @@ namespace AcronymLookup.Core
             return projects;
         }
 
+        
+        /// <summary>
+        /// Submits an Edit TermRequest for a project term.
+        /// Looks up the AbbreviationID internally by abbreviation + project.
+        /// </summary>
+        public bool SubmitEditRequest(int projectId, int requestedByUserId, string abbreviation,
+            string editedDefinition, string editedCategory, string editedNotes, string? requestReason = null)
+        {
+            try
+            {
+                // Look up the AbbreviationID for this term in this project
+                string lookupQuery = @"
+                    SELECT a.AbbreviationID
+                    FROM Abbreviations a
+                    INNER JOIN AbbreviationProjects ap ON a.AbbreviationID = ap.AbbreviationID
+                    WHERE UPPER(a.Abbreviation) = @Abbreviation
+                        AND ap.ProjectID = @ProjectID
+                        AND a.IsActive = 1
+                        AND ap.IsActive = 1";
+
+                int abbreviationId;
+                using (SqlConnection connection = new SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    using (SqlCommand cmd = new SqlCommand(lookupQuery, connection))
+                    {
+                        cmd.Parameters.AddWithValue("@Abbreviation", abbreviation.Trim().ToUpper());
+                        cmd.Parameters.AddWithValue("@ProjectID", projectId);
+                        object? result = cmd.ExecuteScalar();
+                        if (result == null)
+                        {
+                            Logger.Log($"SubmitEditRequest: Could not find AbbreviationID for '{abbreviation}' in project {projectId}");
+                            return false;
+                        }
+                        abbreviationId = (int)result;
+                    }
+
+                    string insertQuery = @"
+                        INSERT INTO TermRequests
+                            (ProjectID, RequestedByUserID, RequestType, AbbreviationID,
+                            EditedDefinition, EditedCategory, EditedNotes, RequestReason, Status)
+                        VALUES
+                            (@ProjectID, @UserID, 'Edit', @AbbreviationID,
+                            @EditedDefinition, @EditedCategory, @EditedNotes, @RequestReason, 'Pending')";
+
+                    using (SqlCommand cmd = new SqlCommand(insertQuery, connection))
+                    {
+                        cmd.Parameters.AddWithValue("@ProjectID", projectId);
+                        cmd.Parameters.AddWithValue("@UserID", requestedByUserId);
+                        cmd.Parameters.AddWithValue("@AbbreviationID", abbreviationId);
+                        cmd.Parameters.AddWithValue("@EditedDefinition", editedDefinition);
+                        cmd.Parameters.AddWithValue("@EditedCategory", string.IsNullOrWhiteSpace(editedCategory) ? DBNull.Value : editedCategory.Trim());
+                        cmd.Parameters.AddWithValue("@EditedNotes", string.IsNullOrWhiteSpace(editedNotes) ? DBNull.Value : editedNotes.Trim());
+                        cmd.Parameters.AddWithValue("@RequestReason", string.IsNullOrWhiteSpace(requestReason) ? DBNull.Value : requestReason.Trim());
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+
+                Logger.Log($"Submitted edit request for '{abbreviation}' (AbbreviationID: {abbreviationId}) in project {projectId}");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error submitting edit request: {ex.Message}");
+                return false;
+            }
+        }
+
         #endregion
 
    

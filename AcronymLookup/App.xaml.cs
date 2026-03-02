@@ -753,53 +753,53 @@ namespace AcronymLookup
                 if (_databaseHandler == null || _permissionService == null || _personalDatabaseService == null)
                 {
                     Logger.Log("Required services not available");
-                    MessageBox.Show(
-                        "Service not available",
-                        "Error",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Error);
+                    MessageBox.Show("Service not available", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
                 }
 
                 int userId = _databaseHandler.CurrentUserId;
                 int projectId = _databaseHandler.CurrentProjectId;
 
-                // Check if this is a personal term
-                var personalTerm = _personalDatabaseService.FindPersonalAbbreviation(e.Term.Abbreviation, userId);
-                bool isPersonalTerm = personalTerm != null;
-
-                // Check permissions for project terms
+                // FIX: base isPersonalTerm on the term's actual source, not existence in personal DB
+                bool isPersonalTerm = e.Term.Source == "Personal";
                 bool canEditProject = _permissionService.CanEditTermsDirectly(userId, projectId);
+                bool canRequestEdit = _permissionService.CanRequestEdits(userId, projectId);
 
-                // Determine if user can edit this term
-                bool canEdit = isPersonalTerm || canEditProject;
-
-                if (!canEdit)
+                if (isPersonalTerm)
                 {
-                    Logger.Log($"User does not have permission to edit '{e.Term.Abbreviation}'");
+                    // Always allow editing own personal terms directly
+                    var editWindow = new EditTermWindow(e.Term, isPersonalTerm: true);
+                    editWindow.TermEdited += OnTermEdited;
+                    editWindow.ShowDialog();
+                }
+                else if (canEditProject)
+                {
+                    // Direct edit for Contributors and above
+                    var editWindow = new EditTermWindow(e.Term, isPersonalTerm: false);
+                    editWindow.TermEdited += OnTermEdited;
+                    editWindow.ShowDialog();
+                }
+                else if (canRequestEdit)
+                {
+                    // Viewer: open edit window flagged as a request
+                    var editWindow = new EditTermWindow(e.Term, isPersonalTerm: false, isEditRequest: true);
+                    editWindow.TermEdited += OnTermEdited;
+                    editWindow.ShowDialog();
+                }
+                else
+                {
+                    Logger.Log($"User does not have permission to edit or request edits for '{e.Term.Abbreviation}'");
                     MessageBox.Show(
-                        $"You don't have permission to edit project terms.\n\n" +
-                        $"You can only edit terms in your personal database.",
+                        "You don't have permission to edit or request edits for project terms.",
                         "Permission Denied",
                         MessageBoxButton.OK,
                         MessageBoxImage.Warning);
-                    return;
                 }
-
-                // Show edit window
-                var editWindow = new EditTermWindow(e.Term, isPersonalTerm);
-                editWindow.TermEdited += OnTermEdited;
-
-                bool? result = editWindow.ShowDialog();
             }
             catch (Exception ex)
             {
                 Logger.Log($"Error handling edit request: {ex.Message}");
-                MessageBox.Show(
-                    $"Error: {ex.Message}",
-                    "Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -848,6 +848,33 @@ namespace AcronymLookup
                             "Update Failed",
                             MessageBoxButton.OK,
                             MessageBoxImage.Warning);
+                    }
+                }
+                else if (e.IsEditRequest)
+                {
+                    // Viewer submitting an edit request through the approval queue
+                    int projectId = _databaseHandler.CurrentProjectId;
+                    success = _databaseHandler.SubmitEditRequest(
+                        projectId,
+                        userId,
+                        e.Abbreviation,
+                        e.NewDefinition,
+                        e.NewCategory,
+                        e.NewNotes);
+
+                    if (success)
+                    {
+                        Logger.Log($"Submitted edit request for project term '{e.Abbreviation}'");
+                        MessageBox.Show(
+                            $"Edit request submitted for '{e.Abbreviation}'!\n\nA project manager will review your changes.",
+                            "Request Submitted",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        Logger.Log($"Failed to submit edit request for '{e.Abbreviation}'");
+                        MessageBox.Show("Failed to submit edit request.", "Request Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
                     }
                 }
                 else

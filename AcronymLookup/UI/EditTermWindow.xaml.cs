@@ -18,15 +18,17 @@ namespace AcronymLookup.UI
         #region Properties
         private readonly AbbreviationData _originalTerm;
         private readonly bool _isPersonalTerm;
+        private readonly bool _isEditRequest;
         #endregion
 
         #region Constructor
-        public EditTermWindow(AbbreviationData term, bool isPersonalTerm = false)
+        public EditTermWindow(AbbreviationData term, bool isPersonalTerm = false, bool isEditRequest = false)
         {
             InitializeComponent();
 
             _originalTerm = term ?? throw new ArgumentNullException(nameof(term));
             _isPersonalTerm = isPersonalTerm;
+            _isEditRequest = isEditRequest;
 
             // Pre-fill the form with current values
             AbbreviationInput.Text = term.Abbreviation;
@@ -35,7 +37,8 @@ namespace AcronymLookup.UI
             NotesInput.Text = term.Notes ?? "";
 
             // Update title based on term type
-            this.Title = isPersonalTerm ? "Edit Personal Term" : "Edit Project Term";
+            this.Title = isPersonalTerm ? "Edit Personal Term" : 
+                         isEditRequest ? "Request Term Edit" : "Edit Project Term";
 
             // Focus on definition (most likely field to edit)
             DefinitionInput.Focus();
@@ -86,7 +89,8 @@ namespace AcronymLookup.UI
                     newDefinition,
                     newCategory,
                     newNotes,
-                    _isPersonalTerm);
+                    _isPersonalTerm,
+                    _isEditRequest);
 
                 TermEdited?.Invoke(this, args);
 
@@ -146,19 +150,23 @@ namespace AcronymLookup.UI
             public string NewCategory { get; }
             public string NewNotes { get; }
             public bool IsPersonalTerm { get; }
+            public bool IsEditRequest { get; }
+
 
             public TermEditedEventArgs(
                 string abbreviation,
                 string newDefinition,
                 string newCategory,
                 string newNotes,
-                bool isPersonalTerm)
+                bool isPersonalTerm,
+                bool isEditRequest = false)
             {
                 Abbreviation = abbreviation;
                 NewDefinition = newDefinition;
                 NewCategory = newCategory;
                 NewNotes = newNotes;
                 IsPersonalTerm = isPersonalTerm;
+                IsEditRequest = isEditRequest; 
             }
         }
         #endregion
