@@ -214,25 +214,26 @@ namespace AcronymLookup
             {
                 bool connected = _databaseHandler.TestConnection();
 
-                #if DEBUG
-                    var switcher = new DebugUserSwitcher(_connectionString);
-                    bool impersonating = switcher.ShowDialog() == true;
-                    int? debugUserId = impersonating ? switcher.SelectedUserId : null;
-                    Logger.Log(impersonating && debugUserId.HasValue
-                        ? $"[DEBUG] Startup impersonating UserID {debugUserId}"
-                        : "[DEBUG] Using real Windows auth");
-                #endif
-
                 if (connected)
                 {
 
                     string windowsUsername = System.Security.Principal.WindowsIdentity.GetCurrent().Name;
                     Logger.Log($"current windows user: {windowsUsername}");
 
+                    int? userId = null;
+
                     //int? userId = _databaseHandler.GetUserIdByWindowsUsername(windowsUsername);
 
                     #if DEBUG
-                        userId = impersonating && debugUserId.HasValue
+                        var switcher = new DebugUserSwitcher(_connectionString);
+                        bool impersonating = switcher.ShowDialog() == true;
+                        int? debugUserId = impersonating ? switcher.SelectedUserId : null;
+
+                        Logger.Log(impersonating && debugUserId.HasValue
+                            ? $"[DEBUG] Startup impersonating UserID {debugUserId}"
+                            : "[Debug] Using real Windows auth"); 
+
+                        userId = (impersonating && debugUserId.HasValue)
                             ? debugUserId
                             : _databaseHandler.GetUserIdByWindowsUsername(windowsUsername);
                     #else
