@@ -396,7 +396,7 @@ namespace AcronymLookup.Core
             try
             {
                 // Get the current values and AbbreviationID
-                var current = FindAbbreviation(abbreviation);
+                var current = GetCurrentAbbreviationValues(abbreviation);
                 if (current == null)
                 {
                     Logger.Log($"Cannot update: '{abbreviation}' not found");
@@ -744,6 +744,49 @@ namespace AcronymLookup.Core
             }
 
             return true; 
+        }
+
+        /// <summary>
+        /// Fetches current abbreviation values for audit diff during updates.
+        /// Does NOT check project membership ~ permission was verified before the edit window opened.
+        /// </summary>
+        private AbbreviationData? GetCurrentAbbreviationValues(string abbreviation)
+        {
+            try
+            {
+                string query = @"
+                    SELECT Abbreviation, Definition, Category, Notes
+                    FROM Abbreviations
+                    WHERE UPPER(Abbreviation) = @Abbreviation
+                        AND IsActive = 1";
+
+                using (SqlConnection connection = new SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    using (SqlCommand command = new SqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@Abbreviation", abbreviation.Trim().ToUpper());
+                        using (SqlDataReader reader = command.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                return new AbbreviationData(
+                                    reader.GetString(0),
+                                    reader.GetString(1),
+                                    reader.IsDBNull(2) ? "" : reader.GetString(2),
+                                    reader.IsDBNull(3) ? "" : reader.GetString(3),
+                                    "Project");
+                            }
+                        }
+                    }
+                }
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Error fetching current abbreviation values: {ex.Message}");
+                return null;
+            }
         }
 
         #endregion
